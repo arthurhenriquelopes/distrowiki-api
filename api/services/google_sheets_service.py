@@ -190,24 +190,30 @@ class GoogleSheetsService:
             release_date_str = data.get("release date", "").strip()
             release_date = self._parse_date(release_date_str)
             
-            # Criar objeto
+            # Criar objeto com todos os campos do Google Sheets
             distro = DistroMetadata(
                 id=distro_id,
                 name=name,
                 summary=data.get("description", "").strip() or None,
                 description=data.get("description", "").strip() or None,
-                logo_url=data.get("logo", "").strip() or None,
+                logo=data.get("logo", "").strip() or None,
+                logo_url=data.get("logo url", "").strip() or None,
+                os_type=data.get("os type", "").strip() or None,
                 family=family,
                 based_on=base or None,
                 origin=data.get("origin", "").strip() or None,
+                desktop=desktop_str or None,
                 desktop_environments=desktop_environments,
                 category=data.get("category", "").strip() or None,
                 status=data.get("status", "").strip() or None,
+                idle_ram_usage=data.get("idle ram usage", "").strip() or None,
+                image_size=data.get("image size", "").strip() or None,
+                office_suite=data.get("office suite", "").strip() or None,
+                price=data.get("price (r$)", "").strip() or None,
                 latest_release_date=release_date,
                 homepage=data.get("website", "").strip() or None,
                 package_manager=data.get("package management", "").strip() or None,
-                architecture=data.get("os type", "").strip() or None,
-                rating=self._parse_rating(data.get("price (r$)", "")),
+                architecture=data.get("architecture", "").strip() or None,
             )
             
             return distro
@@ -289,7 +295,14 @@ class GoogleSheetsService:
         
         date_str = date_str.strip()
         
-        # Tentar vários formatos
+        # Se for apenas um ano (4 dígitos), usar 1º de janeiro daquele ano
+        if date_str.isdigit() and len(date_str) == 4:
+            try:
+                return datetime(int(date_str), 1, 1)
+            except ValueError:
+                pass
+        
+        # Tentar vários formatos completos
         formats = [
             "%Y-%m-%d",
             "%d/%m/%Y",
@@ -304,7 +317,6 @@ class GoogleSheetsService:
             except ValueError:
                 continue
         
-        logger.warning(f"Não foi possível parsear data: {date_str}")
         return None
     
     def _parse_rating(self, price_str: str) -> float:
