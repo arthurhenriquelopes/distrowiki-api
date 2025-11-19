@@ -44,4 +44,4 @@ Thumbs.db
 
 # Cache
 .cache/
-data/cache/
+# data/cache/ - comentado para permitir commit dos dados scraped pelo GitHub Actions
