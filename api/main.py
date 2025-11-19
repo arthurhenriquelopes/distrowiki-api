@@ -92,8 +92,9 @@ app.add_middleware(
         "https://*.lovable.app",
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",  # Permite todos os previews e deployments do Vercel
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
