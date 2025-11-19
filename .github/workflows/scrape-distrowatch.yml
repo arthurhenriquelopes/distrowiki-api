@@ -1,0 +1,63 @@
+name: Scrape DistroWatch
+
+on:
+  # Executa automaticamente todos os dias às 3h UTC (0h BRT)
+  schedule:
+    - cron: '0 3 * * *'
+  
+  # Permite executar manualmente
+  workflow_dispatch:
+  
+  # Executa em push para testar
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/scrape-distrowatch.yml'
+      - 'api/scraping/**'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: 📦 Instalar dependências
+        run: |
+          pip install --upgrade pip
+          pip install cloudscraper beautifulsoup4 lxml requests-toolbelt
+      
+      - name: 🚀 Executar scraper
+        run: python scrape_runner.py
+      
+      - name: 📊 Commit resultados
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/cache/distros_scraped.json
+          git diff --staged --quiet || git commit -m "🤖 Update scraped data - $(date -u +'%Y-%m-%d %H:%M UTC')"
+      
+      - name: 🚀 Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+      
+      - name: 📈 Summary
+        run: |
+          echo "## 🎉 Scraping Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          if [ -f "data/cache/distros_scraped.json" ]; then
+            TOTAL=$(cat data/cache/distros_scraped.json | python -c "import sys, json; print(json.load(sys.stdin)['total'])")
+            echo "- **Distros scraped**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          fi
