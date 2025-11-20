@@ -57,6 +57,61 @@ class DistroWatchCloudScraper:
             return match.group(1)
         return ""
     
+    def _get_fallback_distros(self, limit: int = 230) -> List[Dict]:
+        """
+        Retorna lista predefinida das distribuições mais populares.
+        
+        Usado quando o scraping do ranking falha (geralmente por 403).
+        Lista baseada no ranking "Last 1 month" do DistroWatch.
+        
+        Args:
+            limit: Número máximo de distros a retornar
+        
+        Returns:
+            Lista de dicts com rank, name, slug, url
+        """
+        # Top 230 distros do DistroWatch (ordenadas por popularidade)
+        fallback_list = [
+            "cachyos", "mxlinux", "linuxmint", "popos", "endeavouros", "manjaro", "ubuntu",
+            "debian", "fedora", "opensuse", "zorin", "elementary", "kdeneon", "arch", "garuda",
+            "nobara", "lmde", "blendos", "vanillaos", "archcraft", "biglinux", "antiX", "peppermint",
+            "arcolinux", "lite", "gentoo", "sparky", "kde", "voyager", "slackware",
+            "rocky", "alma", "nixos", "artix", "freebsd", "tuxedo", "rhel", "devuan", "solus",
+            "alpine", "void", "tails", "openbsd", "mageia", "bodhi", "pclinuxos", "kali", "porteus",
+            "dietpi", "linuxfx", "puppy", "netbsd", "android", "parrot", "pureos", "q4os", "trisquel",
+            "crunchbang", "opensuse-microos", "deepin", "openmandriva", "calculate", "ubuntuunity",
+            "dragonfly", "oracle", "ubuntudde", "haiku", "clearlinux", "dragora", "ubuntukylin", "spiral",
+            "freespire", "redcore", "suse", "redhat", "emmabuntus", "rose", "siduction", "kaos", "feren",
+            "batocera", "porteus-kiosk", "bunsenlabs", "slax", "knoppix", "pearos", "hpux", "salix",
+            "solaris", "opensuse-slowroll", "voidpup", "rebornos", "kuklinux", "astra", "au", "hyperbola",
+            "xubuntu", "lubuntu", "kubuntu", "4mlinux", "gobolinux", "septor", "ubuntustudio", "bluestar",
+            "lakka", "tinycore", "ubuntumate", "raspberry", "scientific", "irix", "snal", "unraid",
+            "parabola", "elive", "antergos", "grml", "freenas", "murena", "xerolinux", "openwrt",
+            "qubes", "murena-two", "ubuntucinnamon", "kaisen", "clearos", "truenas", "ubuntubudgie", "clonezilla",
+            "guix", "slitaz", "redo", "qubes-whonix", "thinstation", "tiny", "finnix", "nitrux",
+            "uruk", "paldo", "linuxbbq", "pentoo", "blackarch", "rescuezilla", "lfs", "systemrescue",
+            "murena-fairphone", "plamo", "wifislax", "superb", "ubos", "chromeos", "steamos", "vyos",
+            "mx-23", "osgeolive", "openindiana", "neptune", "crux", "caine", "austrumi", "volumio",
+            "cloudlinux", "absolute", "mx-21", "reactos", "sabayon", "ventoy", "viperr", "adelie",
+            "linspire", "hanthana", "bhodi", "endless", "linuxconsole", "smoothwall", "moebius", "pfsense",
+            "neon", "plop", "batocera-plus", "eurolinux", "debian-astro", "drauger", "springdale", "slackel",
+            "kwort", "linuxmce", "vine", "volumio-primo", "slackex", "funtoo", "ipfire", "picaros",
+            "smoothwall-express", "linuxmint-lmde", "dahlia", "primtux", "wattOS", "turbolinux", "makulu",
+            "velt", "zentyal", "supergrubdisk", "rlxos", "rescatux", "murena-degooglified", "navylinux", "murena-teracube",
+            "cub", "antix-core", "astralinux", "volumio-rivo"
+        ]
+        
+        distros = []
+        for idx, slug in enumerate(fallback_list[:limit], start=1):
+            distros.append({
+                'rank': idx,
+                'name': slug.capitalize(),
+                'slug': slug,
+                'url': f"{self.base_url}/table.php?distribution={slug}"
+            })
+        
+        return distros
+    
     def _parse_category(self, soup: BeautifulSoup) -> Optional[str]:
         """
         Extrai categoria da página da distro.
@@ -232,7 +287,10 @@ class DistroWatchCloudScraper:
             
         except Exception as e:
             logger.error(f"❌ Erro ao fazer scraping do ranking: {e}")
-            return []
+            
+            # Fallback: se falhou (geralmente 403), usar lista predefinida
+            logger.warning("⚠️ Usando fallback: lista predefinida de distros")
+            return self._get_fallback_distros(limit)
     
     def scrape_distro_details(self, slug: str, url: str) -> Optional[Dict]:
         """
