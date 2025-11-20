@@ -62,18 +62,6 @@ if [ ! -f "venv/bin/uvicorn" ]; then
     echo -e "${GREEN}✅ Dependências instaladas${NC}\n"
 fi
 
-# Verifica se Playwright está instalado
-PLAYWRIGHT_INSTALLED=false
-if python3 -c "import playwright" 2>/dev/null; then
-    PLAYWRIGHT_INSTALLED=true
-fi
-
-if [ "$PLAYWRIGHT_INSTALLED" = true ] && [ ! -d "$HOME/.cache/ms-playwright/chromium-"* ]; then
-    echo -e "${YELLOW}🌐 Instalando browsers do Playwright...${NC}"
-    playwright install chromium
-    echo -e "${GREEN}✅ Chromium instalado${NC}\n"
-fi
-
 # Cria diretório de cache se não existir
 if [ ! -d "data/cache" ]; then
     echo -e "${BLUE}📁 Criando diretório de cache...${NC}"
@@ -106,7 +94,6 @@ echo -e "${BLUE}📍 Host:${NC}      0.0.0.0:8000"
 echo -e "${BLUE}📚 Docs:${NC}      http://localhost:8000/docs"
 echo -e "${BLUE}❤️  Health:${NC}    http://localhost:8000/health"
 echo -e "${BLUE}🔥 Modo:${NC}      Development (hot-reload)"
-echo -e "${BLUE}🤖 Scraping:${NC}  http://localhost:8000/scraping/status"
 echo -e "\n${YELLOW}⌨️  Pressione Ctrl+C para parar o servidor${NC}\n"
 
 # Aguardar 3 segundos e abrir navegador em segundo plano
