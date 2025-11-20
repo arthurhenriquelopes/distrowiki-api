@@ -72,11 +72,26 @@ class DistroWatchCloudScraper:
         """Carrega e valida proxies das listas públicas do GitHub."""
         logger.info("🔄 Carregando proxies...")
         
-        proxy_urls = [
-            "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
-            "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt",
-            "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt"
-        ]
+        # Verificar se PySocks está disponível
+        try:
+            import socks
+            has_socks = True
+            logger.info("✅ PySocks detectado - suporte a SOCKS habilitado")
+        except ImportError:
+            has_socks = False
+            logger.warning("⚠️ PySocks não instalado - usando apenas proxies HTTP")
+        
+        proxy_urls = []
+        
+        # Adicionar SOCKS apenas se disponível
+        if has_socks:
+            proxy_urls.extend([
+                "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
+                "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt"
+            ])
+        
+        # Sempre adicionar HTTP
+        proxy_urls.append("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt")
         
         all_proxies = []
         
@@ -87,7 +102,7 @@ class DistroWatchCloudScraper:
                     proxies = response.text.strip().split('\n')
                     proxy_type = 'socks5' if 'socks5' in url else ('socks4' if 'socks4' in url else 'http')
                     
-                    for proxy in proxies[:50]:  # Limitar a 50 de cada tipo
+                    for proxy in proxies[:100]:  # Aumentar para 100 de cada tipo
                         proxy = proxy.strip()
                         if proxy and not proxy.startswith('#'):
                             all_proxies.append({
@@ -95,16 +110,19 @@ class DistroWatchCloudScraper:
                                 'address': proxy
                             })
                     
-                    logger.info(f"✅ Carregados {len(proxies[:50])} proxies {proxy_type.upper()}")
+                    logger.info(f"✅ Carregados {min(100, len(proxies))} proxies {proxy_type.upper()}")
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao carregar {url}: {e}")
+        
+        if not all_proxies:
+            logger.warning("⚠️ Nenhum proxy carregado, continuando sem proxies")
+            return
         
         # Embaralhar para distribuir melhor
         random.shuffle(all_proxies)
         
-        # Guardar todos os proxies sem testar (teste será feito durante uso)
-        # Isso acelera a inicialização
-        self.working_proxies = all_proxies[:30]  # Usar os primeiros 30
+        # Guardar mais proxies para ter mais opções
+        self.working_proxies = all_proxies[:50]  # Aumentar para 50
         
         logger.info(f"✅ {len(self.working_proxies)} proxies carregados e prontos para uso")
     
@@ -126,7 +144,7 @@ class DistroWatchCloudScraper:
             'https': f"{proxy_info['type']}://{proxy_info['address']}"
         }
     
-    def _make_request(self, url: str, timeout: int = 15) -> requests.Response:
+    def _make_request(self, url: str, timeout: int = 10) -> requests.Response:
         """
         Faz uma requisição usando proxy rotativo ou direto.
         
@@ -139,22 +157,37 @@ class DistroWatchCloudScraper:
         """
         # Tentar com proxy se disponível
         if self.use_proxies and self.working_proxies:
-            max_attempts = min(5, len(self.working_proxies))  # Tentar até 5 proxies
+            max_attempts = min(10, len(self.working_proxies))  # Tentar até 10 proxies
             
             for attempt in range(max_attempts):
                 try:
                     proxies = self._get_next_proxy()
                     response = self.scraper.get(url, timeout=timeout, proxies=proxies)
                     response.raise_for_status()
-                    logger.debug(f"✅ Request com proxy bem-sucedido")
+                    logger.debug(f"✅ Request com proxy bem-sucedido (tentativa {attempt + 1})")
                     return response
                 except requests.exceptions.HTTPError as e:
-                    if e.response.status_code == 403:
+                    if hasattr(e, 'response') and e.response.status_code == 403:
                         logger.debug(f"⚠️ Proxy bloqueado (403), tentando outro...")
                         continue
-                    raise
+                    logger.debug(f"⚠️ HTTP error: {e}")
+                    continue
+                except (requests.exceptions.ProxyError, 
+                        requests.exceptions.ConnectTimeout,
+                        requests.exceptions.ReadTimeout,
+                        requests.exceptions.ConnectionError,
+                        OSError) as e:
+                    # Erros comuns de proxy - tentar próximo
+                    logger.debug(f"⚠️ Proxy error (tentativa {attempt + 1}): {type(e).__name__}")
+                    continue
                 except Exception as e:
-                    logger.debug(f"⚠️ Proxy falhou (tentativa {attempt + 1}/{max_attempts}): {type(e).__name__}")
+                    # Outros erros - logar e tentar próximo
+                    error_msg = str(e)
+                    if 'Missing dependencies for SOCKS' in error_msg:
+                        logger.warning("⚠️ PySocks não instalado, pulando proxies SOCKS")
+                        # Pular para tentar sem proxy
+                        break
+                    logger.debug(f"⚠️ Erro inesperado (tentativa {attempt + 1}): {type(e).__name__}: {error_msg[:100]}")
                     continue
         
         # Fallback: tentar sem proxy
@@ -164,7 +197,7 @@ class DistroWatchCloudScraper:
             logger.debug(f"✅ Request sem proxy bem-sucedido")
             return response
         except Exception as e:
-            logger.error(f"❌ Todas as tentativas falharam: {e}")
+            logger.error(f"❌ Todas as tentativas falharam: {type(e).__name__}")
             raise
     
     def _get_fallback_distros(self, limit: int = 230) -> List[Dict]:

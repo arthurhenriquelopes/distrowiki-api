@@ -33,7 +33,7 @@ jobs:
       - name: 📦 Instalar dependências
         run: |
           pip install --upgrade pip
-          pip install cloudscraper beautifulsoup4 lxml requests-toolbelt
+          pip install cloudscraper beautifulsoup4 lxml requests-toolbelt PySocks
       
       - name: 🚀 Executar scraper
         run: python scrape_runner.py
