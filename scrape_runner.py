@@ -43,9 +43,9 @@ def main():
         # Configura scraper (CloudScraper é síncrono)
         scraper = DistroWatchCloudScraper(delay=2)
         
-        # Executa scraping (top 100 distros)
-        logger.info("🔍 Scraping top 100 distribuições...")
-        results = scraper.scrape_all(limit=100)
+        # Executa scraping (top 230 distros conforme requisito)
+        logger.info("🔍 Scraping top 230 distribuições...")
+        results = scraper.scrape_all(limit=230)
         
         # Prepara dados
         data = {
@@ -56,7 +56,8 @@ def main():
             'metadata': {
                 'source': 'distrowatch.com',
                 'scraper': 'cloudscraper',
-                'version': '3.0.0'
+                'version': '4.0.0',
+                'fields': ['name', 'id', 'category', 'release_date', 'popularity_rank', 'popularity_hits', 'rating']
             }
         }
         
@@ -82,7 +83,7 @@ def main():
         if results:
             print("🔝 Top 5 Distros:")
             for i, distro in enumerate(results[:5], 1):
-                print(f"  {i}. {distro.get('name', 'N/A')} (Rank: {distro.get('rank', 'N/A')})")
+                print(f"  {i}. {distro.get('name', 'N/A')} ({distro.get('id', 'N/A')}) - Rating: {distro.get('rating', 'N/A')}")
         
         return 0
         

@@ -1,9 +1,11 @@
 """
-Scraper do DistroWatch usando CloudScraper
-Bypass automático de Cloudflare e proteções anti-bot.
+Scraper do DistroWatch usando CloudScraper.
+Extrai dados reais das páginas de distribuições Linux.
 """
 
 import logging
+import re
+import time
 import cloudscraper
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -14,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 class DistroWatchCloudScraper:
     """
-    Scraper para DistroWatch usando CloudScraper.
+    Scraper para DistroWatch.
     
-    Características:
-    - Bypass automático de Cloudflare
-    - Leve e rápido (sem navegador)
-    - User-agent rotativo
-    - Retry automático
+    Extrai informações de distribuições Linux:
+    - Nome, ID, Categoria
+    - Data de lançamento (formato BR: DD/MM/YYYY)
+    - Popularidade (4 semanas)
+    - Rating (avaliação dos visitantes)
     """
     
     def __init__(self, delay: int = 2):
@@ -28,7 +30,7 @@ class DistroWatchCloudScraper:
         Inicializa o scraper.
         
         Args:
-            delay: Delay entre requests em segundos
+            delay: Delay entre requests em segundos (rate limiting)
         """
         self.base_url = "https://distrowatch.com"
         self.delay = delay
@@ -40,60 +42,124 @@ class DistroWatchCloudScraper:
             }
         )
         
-    def _get_fallback_distros(self) -> List[Dict]:
+    def _extract_slug_from_url(self, url: str) -> str:
         """
-        Retorna lista de fallback com as distros mais populares.
-        Usado quando o DistroWatch bloqueia o scraping.
-        """
-        logger.info("🔄 Usando dados de fallback (top distros conhecidas)")
+        Extrai o slug/ID da distribuição da URL.
         
-        # Top 100 distros baseadas em rankings históricos do DistroWatch
-        top_distros = [
-            "MX Linux", "EndeavourOS", "Mint", "Manjaro", "Pop!_OS",
-            "Ubuntu", "Debian", "Fedora", "openSUSE", "Zorin",
-            "elementary", "Kali", "Garuda", "Arch", "Tails",
-            "Solus", "Rocky", "AlmaLinux", "NixOS", "FreeBSD",
-            "Gentoo", "CentOS", "Slackware", "antiX", "PCLinuxOS",
-            "Mageia", "KDE neon", "Q4OS", "Bodhi", "Parrot",
-            "Artix", "Puppy", "Void", "Lubuntu", "Kubuntu",
-            "Xubuntu", "Ubuntu MATE", "Ubuntu Budgie", "Peppermint", "Lite",
-            "Deepin", "MX Linux", "Sparky", "Nitrux", "AV Linux",
-            "Clear Linux", "Raspberry Pi OS", "Endless OS", "OpenMandriva", "Regata",
-            "Calculate", "Alpine", "Tiny Core", "Porteus", "Salix",
-            "Slax", "SliTaz", "Absolute", "Bluestar", "Grml",
-            "SystemRescue", "GParted Live", "Clonezilla", "Ultimate Boot", "Knoppix",
-            "Trisquel", "Parabola", "PureOS", "Guix", "Hyperbola",
-            "4MLinux", "Scientific", "BunsenLabs", "CrunchBang++", "SparkyLinux",
-            "ArcoLinux", "Garuda", "RebornOS", "BigLinux", "Cachyos",
-            "Crystal", "Mabox", "Vanilla", "Nobara", "Bluefin",
-            "Bazzite", "ChimeraOS", "HoloISO", "SteamOS", "Batocera",
-            "Lakka", "RetroPie", "Recalbox", "EmuELEC", "CoreELEC",
-            "LibreELEC", "OSMC", "Volumio", "moOde", "piCorePlayer"
-        ]
-        
-        distros = []
-        for i, name in enumerate(top_distros, 1):
-            # Normaliza o nome para criar a URL
-            distro_slug = name.lower().replace(" ", "").replace("!", "").replace("_", "")
-            
-            distros.append({
-                'rank': str(i),
-                'name': name,
-                'url': f"{self.base_url}/table.php?distribution={distro_slug}"
-            })
-        
-        return distros
-    
-    def scrape_distro_list(self) -> List[Dict]:
-        """
-        Scrape lista de distribuições da página de popularidade.
+        Args:
+            url: URL da distro (ex: https://distrowatch.com/table.php?distribution=ubuntu)
         
         Returns:
-            Lista de dicionários com dados básicos das distros
+            Slug da distro (ex: "ubuntu")
         """
-        logger.info("🔍 Iniciando scraping da lista de distribuições...")
+        match = re.search(r'distribution=([^&]+)', url)
+        if match:
+            return match.group(1)
+        return ""
+    
+    def _parse_category(self, soup: BeautifulSoup) -> Optional[str]:
+        """
+        Extrai categoria da página da distro.
         
-        url = f"{self.base_url}/popularity"
+        Returns:
+            String com categorias separadas por vírgula (ex: "Desktop, Live Medium")
+        """
+        try:
+            for li in soup.find_all('li'):
+                b_tag = li.find('b')
+                if b_tag and 'Categoria' in b_tag.get_text():
+                    categories = [a.get_text(strip=True) for a in li.find_all('a')]
+                    return ', '.join(categories)
+        except Exception as e:
+            logger.debug(f"Erro ao extrair categoria: {e}")
+        return None
+    
+    def _parse_release_date(self, soup: BeautifulSoup) -> Optional[str]:
+        """
+        Extrai data de lançamento da versão mais recente.
+        
+        Returns:
+            Data no formato DD/MM/YYYY (ex: "17/11/2025")
+        """
+        try:
+            for th in soup.find_all('th'):
+                if 'Data de Lançamento' in th.get_text():
+                    row = th.find_parent('tr')
+                    date_td = row.find('td', class_='Date')
+                    if date_td:
+                        date_str = date_td.get_text(strip=True)  # "2025-11-17"
+                        # Converter para formato brasileiro
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                        return date_obj.strftime('%d/%m/%Y')  # "17/11/2025"
+        except Exception as e:
+            logger.debug(f"Erro ao extrair data de lançamento: {e}")
+        return None
+    
+    def _parse_popularity(self, soup: BeautifulSoup) -> Dict[str, Optional[int]]:
+        """
+        Extrai popularidade de 4 semanas (rank e hits por dia).
+        
+        Returns:
+            Dict com 'rank' e 'hits_per_day'
+        """
+        result = {'rank': None, 'hits_per_day': None}
+        
+        try:
+            # Buscar texto que contém "4 semanas"
+            for text_node in soup.find_all(string=re.compile(r'4 semanas')):
+                full_text = text_node.parent.get_text()
+                # Pattern: "4 semanas: 21 (603)" ou "4 semanas: <b>21</b> (603)"
+                match = re.search(r'4 semanas:\s*(\d+)\s*\(([0-9,]+)\)', full_text)
+                if match:
+                    result['rank'] = int(match.group(1))
+                    result['hits_per_day'] = int(match.group(2).replace(',', ''))
+                    break
+        except Exception as e:
+            logger.debug(f"Erro ao extrair popularidade: {e}")
+        
+        return result
+    
+    def _parse_rating(self, soup: BeautifulSoup) -> Optional[float]:
+        """
+        Extrai rating (avaliação dos visitantes).
+        
+        Returns:
+            Número decimal do rating (ex: 8.0)
+        """
+        try:
+            # Buscar por <a> que contém "Average visitor rating"
+            for a_tag in soup.find_all('a', href=lambda x: x and 'ratings' in x):
+                if 'Average visitor rating' in a_tag.get_text():
+                    # Estrutura: <b><a>Average visitor rating</a></b>: <b>8.0</b>/10
+                    parent_b = a_tag.parent  # <b> que envolve o <a>
+                    if parent_b and parent_b.name == 'b':
+                        # Buscar o próximo <b> após o </b> do link
+                        for sibling in parent_b.next_siblings:
+                            if hasattr(sibling, 'name') and sibling.name == 'b':
+                                # Este é o <b>8.0</b>
+                                rating_text = sibling.get_text(strip=True)
+                                try:
+                                    return float(rating_text)
+                                except ValueError:
+                                    pass
+        except Exception as e:
+            logger.debug(f"Erro ao extrair rating: {e}")
+        return None
+    
+    def scrape_ranking_page(self, limit: int = 230) -> List[Dict]:
+        """
+        Scrape página de ranking (/popularity) para obter lista de distros.
+        Busca apenas da tabela "Last 1 month".
+        
+        Args:
+            limit: Número máximo de distros para extrair (padrão: 230)
+        
+        Returns:
+            Lista de dicts com 'rank', 'name', 'slug', 'url'
+        """
+        logger.info(f"🔍 Buscando top {limit} distros da página de ranking...")
+        
+        url = f"{self.base_url}/dwres.php?resource=popularity"
         
         try:
             logger.info(f"📡 Acessando: {url}")
@@ -102,151 +168,213 @@ class DistroWatchCloudScraper:
             
             logger.info(f"✅ Status: {response.status_code}")
             
-            # Parse HTML
             soup = BeautifulSoup(response.text, 'html.parser')
             distros = []
             
-            # Na página /popularity, os rankings estão em uma tabela simples
-            # Busca todos os links de distros na página
-            links = soup.find_all('a', href=lambda x: x and 'table.php?distribution=' in x)
+            # Encontrar tabela "Last 1 month"
+            target_table = None
+            for th in soup.find_all('th', class_='Invert'):
+                if 'Last 1 month' in th.get_text():
+                    target_table = th.find_parent('table')
+                    logger.info("✅ Tabela 'Last 1 month' encontrada")
+                    break
             
-            if not links:
-                logger.warning("⚠️ Nenhum link de distro encontrado na página")
+            if not target_table:
+                logger.error("❌ Tabela 'Last 1 month' não encontrada")
                 return []
             
-            logger.info(f"📊 Encontrados {len(links)} links de distros")
+            # Percorrer linhas da tabela
+            rows = target_table.find_all('tr')
             
-            # Extrai dados de cada link
-            seen_distros = set()  # Para evitar duplicatas
+            for row in rows:
+                # Buscar células de ranking
+                rank_cell = row.find('th', class_='phr1')
+                name_cell = row.find('td', class_='phr2')
+                
+                if rank_cell and name_cell:
+                    try:
+                        rank = int(rank_cell.get_text(strip=True))
+                        
+                        # Extrair link e nome
+                        link = name_cell.find('a')
+                        if not link:
+                            continue
+                        
+                        name = link.get_text(strip=True)
+                        href = link.get('href', '')
+                        
+                        # Extrair slug da URL
+                        slug = self._extract_slug_from_url(href)
+                        
+                        if not slug:
+                            continue
+                        
+                        # URL completa
+                        full_url = f"{self.base_url}/table.php?distribution={slug}"
+                        
+                        distros.append({
+                            'rank': rank,
+                            'name': name,
+                            'slug': slug,
+                            'url': full_url
+                        })
+                        
+                        # Parar se atingiu o limite
+                        if len(distros) >= limit:
+                            break
+                    
+                    except (ValueError, AttributeError) as e:
+                        logger.debug(f"Erro ao processar linha: {e}")
+                        continue
             
-            for link in links:
-                distro_name = link.get_text(strip=True)
-                distro_url = link.get('href')
-                
-                # Evita duplicatas
-                if distro_name in seen_distros:
-                    continue
-                seen_distros.add(distro_name)
-                
-                # Normaliza URL
-                if not distro_url.startswith('http'):
-                    distro_url = f"{self.base_url}/{distro_url}"
-                
-                # Tenta extrair o rank do contexto (linha da tabela)
-                rank = None
-                parent_tr = link.find_parent('tr')
-                if parent_tr:
-                    # Primeira célula geralmente contém o rank
-                    first_td = parent_tr.find('td')
-                    if first_td:
-                        rank_text = first_td.get_text(strip=True)
-                        if rank_text.isdigit():
-                            rank = rank_text
-                
-                # Se não encontrou rank, usa posição na lista
-                if not rank:
-                    rank = str(len(distros) + 1)
-                
-                distros.append({
-                    'rank': rank,
-                    'name': distro_name,
-                    'url': distro_url
-                })
-            
-            logger.info(f"✅ Scraped {len(distros)} distribuições únicas")
+            logger.info(f"✅ Encontradas {len(distros)} distribuições no ranking")
             return distros
             
         except Exception as e:
-            logger.error(f"❌ Erro ao fazer scraping da lista: {e}")
-            
-            # Se for erro 403 (Forbidden) ou conexão bloqueada, usa fallback
-            if "403" in str(e) or "Forbidden" in str(e) or "Connection" in str(e):
-                logger.warning("🚫 DistroWatch bloqueou o acesso - usando dados de fallback")
-                return self._get_fallback_distros()
-            
-            logger.info("💡 Dica: Se estiver rodando localmente e DistroWatch estiver bloqueado, use GitHub Actions")
+            logger.error(f"❌ Erro ao fazer scraping do ranking: {e}")
             return []
     
-    def scrape_distro_details(self, distro_url: str) -> Optional[Dict]:
+    def scrape_distro_details(self, slug: str, url: str) -> Optional[Dict]:
         """
-        Scrape detalhes de uma distribuição específica.
+        Scrape detalhes completos de uma distribuição.
+        
+        Extrai:
+        - Nome
+        - ID (slug)
+        - Categoria
+        - Data de lançamento (DD/MM/YYYY)
+        - Popularidade (rank e hits/dia de 4 semanas)
+        - Rating
         
         Args:
-            distro_url: URL da página da distro
+            slug: Slug da distro (ex: "ubuntu")
+            url: URL completa da página
         
         Returns:
-            Dict com detalhes da distro ou None se falhar
+            Dict com todos os dados ou None se falhar
         """
-        logger.info(f"📄 Scraping detalhes de: {distro_url}")
+        logger.info(f"📄 Scraping: {slug}")
         
         try:
-            response = self.scraper.get(distro_url, timeout=30)
+            response = self.scraper.get(url, timeout=30)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
-            details = {}
             
-            # Extrai informações da página
-            # Based: seção com informações básicas
-            info_table = soup.find('table', class_='Info')
+            # Extrair nome
+            name = None
+            h1 = soup.find('h1')
+            if h1:
+                name = h1.get_text(strip=True)
             
-            if info_table:
-                rows = info_table.find_all('tr')
-                for row in rows:
-                    cols = row.find_all('td')
-                    if len(cols) >= 2:
-                        key = cols[0].get_text(strip=True).lower().replace(':', '')
-                        value = cols[1].get_text(strip=True)
-                        details[key] = value
+            if not name:
+                logger.warning(f"⚠️ Nome não encontrado para {slug}")
+                return None
             
-            return details
+            # Extrair dados
+            category = self._parse_category(soup)
+            release_date = self._parse_release_date(soup)
+            popularity = self._parse_popularity(soup)
+            rating = self._parse_rating(soup)
+            
+            return {
+                'id': slug,
+                'name': name,
+                'category': category,
+                'release_date': release_date,
+                'popularity_rank': popularity['rank'],
+                'popularity_hits': popularity['hits_per_day'],
+                'rating': rating
+            }
             
         except Exception as e:
-            logger.error(f"❌ Erro ao scraping detalhes: {e}")
+            logger.error(f"❌ Erro ao scraping {slug}: {e}")
             return None
     
-    def scrape_all(self, limit: Optional[int] = None) -> List[Dict]:
+    def scrape_all(self, limit: int = 230) -> List[Dict]:
         """
-        Scrape completo: lista + detalhes de cada distro.
+        Scraping completo: busca ranking + detalhes de cada distro.
         
         Args:
-            limit: Limite de distros para scrape (None = todas)
+            limit: Número de distros para scrape (padrão: 230)
         
         Returns:
-            Lista de distros com todos os dados
+            Lista de distros com todos os dados extraídos
         """
-        logger.info("🚀 Iniciando scraping completo do DistroWatch...")
+        logger.info(f"🚀 Iniciando scraping completo de {limit} distribuições...")
         
-        # Scrape lista
-        distros = self.scrape_distro_list()
+        # 1. Buscar lista do ranking
+        ranking_list = self.scrape_ranking_page(limit=limit)
         
-        if not distros:
-            logger.warning("⚠️ Nenhuma distro encontrada na lista")
+        if not ranking_list:
+            logger.error("❌ Falha ao obter lista de ranking")
             return []
         
-        # Aplica limite se especificado
-        if limit:
-            distros = distros[:limit]
-            logger.info(f"📊 Limitando scraping a {limit} distribuições")
+        logger.info(f"📋 Lista obtida: {len(ranking_list)} distros")
         
-        logger.info(f"✅ Scraping completo: {len(distros)} distribuições processadas")
+        # 2. Scrape detalhes de cada distro
+        all_distros = []
+        total = len(ranking_list)
         
-        return distros
+        for i, item in enumerate(ranking_list, 1):
+            slug = item['slug']
+            url = item['url']
+            rank = item['rank']
+            
+            logger.info(f"[{i}/{total}] Processando #{rank}: {slug}")
+            
+            details = self.scrape_distro_details(slug, url)
+            
+            if details:
+                # Adicionar rank do ranking (caso não tenha popularidade na página)
+                if details['popularity_rank'] is None:
+                    details['popularity_rank'] = rank
+                
+                all_distros.append(details)
+                logger.info(f"✅ {details['name']} - OK")
+            else:
+                logger.warning(f"⚠️ Falha ao processar {slug}")
+            
+            # Rate limiting
+            if i < total:
+                time.sleep(self.delay)
+        
+        logger.info(f"🎉 Scraping concluído: {len(all_distros)}/{total} distros processadas")
+        
+        return all_distros
 
 
 def test_scraper():
-    """Testa o scraper localmente."""
+    """Testa o scraper localmente com 3 distros."""
     import json
     
-    print("🧪 Testando CloudScraper...")
+    print("🧪 Testando DistroWatch Scraper...")
+    print("=" * 50)
     
-    scraper = DistroWatchCloudScraper()
-    results = scraper.scrape_all(limit=5)
+    scraper = DistroWatchCloudScraper(delay=1)
+    results = scraper.scrape_all(limit=3)
     
-    print(f"\n✅ Resultados: {len(results)} distros")
-    print(json.dumps(results, indent=2))
+    print("\n" + "=" * 50)
+    print(f"✅ Resultado: {len(results)} distros scraped")
+    print("=" * 50)
+    
+    for distro in results:
+        print(f"\n📦 {distro['name']} ({distro['id']})")
+        print(f"   Categoria: {distro.get('category', 'N/A')}")
+        print(f"   Data lançamento: {distro.get('release_date', 'N/A')}")
+        print(f"   Popularidade: Rank {distro.get('popularity_rank', 'N/A')} ({distro.get('popularity_hits', 'N/A')} hits/dia)")
+        print(f"   Rating: {distro.get('rating', 'N/A')}")
+    
+    # Salvar JSON para inspeção
+    with open('test_scraping_result.json', 'w', encoding='utf-8') as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    
+    print(f"\n💾 Resultados salvos em: test_scraping_result.json")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     test_scraper()
