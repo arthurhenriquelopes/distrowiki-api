@@ -2,13 +2,21 @@
 Serviço de integração com Google Sheets.
 
 Busca dados de distribuições Linux diretamente do Google Sheets.
-Utiliza API pública sem autenticação (sheets públicas).
+Utiliza API pública sem autenticação (sheets públicas) para leitura.
+Utiliza OAuth 2.0 para escrita (atualização automática).
 """
 
 import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import httpx
+import os
+import json
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from ..models.distro import DistroMetadata, DistroFamily, DesktopEnvironment
 
 logger = logging.getLogger(__name__)
@@ -18,7 +26,7 @@ class GoogleSheetsService:
     """Serviço para buscar dados do Google Sheets."""
     
     # IDs e configuração
-    SHEET_ID = "19rI-zXcpenXXNjEE10PHU6_5z4ldNFy5"
+    SHEET_ID = "1ObKRlMRWtABnau6lZTT6en1BajVkV6m2LtLhXEHZ_Zk"
     SHEET_NAME = "distrowiki_complete"
     
     # URL da API do Google Sheets (v4)
@@ -27,6 +35,13 @@ class GoogleSheetsService:
     # Headers para requisição
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     TIMEOUT = 30.0
+    
+    # OAuth 2.0 Scopes
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+    
+    # Caminhos para credenciais
+    CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
+    TOKEN_FILE = os.getenv('GOOGLE_TOKEN_FILE', 'token.json')
     
     # Mapeamento de famílias
     FAMILY_MAPPING = {
@@ -68,10 +83,74 @@ class GoogleSheetsService:
             headers={"User-Agent": self.USER_AGENT},
             follow_redirects=True,
         )
+        self._sheets_service = None
     
     async def close(self):
         """Fecha o cliente HTTP."""
         await self.client.aclose()
+    
+    def _get_credentials(self) -> Optional[Credentials]:
+        """
+        Obtém credenciais OAuth 2.0 para acesso ao Google Sheets.
+        
+        Returns:
+            Credentials ou None se não configurado.
+        """
+        creds = None
+        
+        # Verificar se já existe token
+        if os.path.exists(self.TOKEN_FILE):
+            try:
+                creds = Credentials.from_authorized_user_file(self.TOKEN_FILE, self.SCOPES)
+            except Exception as e:
+                logger.warning(f"Erro ao carregar token: {e}")
+        
+        # Se não tem credenciais válidas, fazer login
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                    logger.info("Token OAuth renovado com sucesso")
+                except Exception as e:
+                    logger.error(f"Erro ao renovar token: {e}")
+                    creds = None
+            
+            if not creds and os.path.exists(self.CREDENTIALS_FILE):
+                try:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.CREDENTIALS_FILE, self.SCOPES)
+                    creds = flow.run_local_server(port=0)
+                    logger.info("Autenticação OAuth realizada com sucesso")
+                except Exception as e:
+                    logger.error(f"Erro na autenticação OAuth: {e}")
+                    return None
+            
+            # Salvar token para próximas execuções
+            if creds:
+                try:
+                    with open(self.TOKEN_FILE, 'w') as token:
+                        token.write(creds.to_json())
+                    logger.info("Token salvo com sucesso")
+                except Exception as e:
+                    logger.warning(f"Erro ao salvar token: {e}")
+        
+        return creds
+    
+    def _get_sheets_service(self):
+        """
+        Obtém serviço do Google Sheets API com OAuth.
+        
+        Returns:
+            Serviço do Google Sheets API.
+        """
+        if not self._sheets_service:
+            creds = self._get_credentials()
+            if not creds:
+                raise ValueError("Credenciais OAuth não configuradas. Configure credentials.json")
+            
+            self._sheets_service = build('sheets', 'v4', credentials=creds)
+        
+        return self._sheets_service
     
     async def fetch_all_distros(self) -> List[DistroMetadata]:
         """
@@ -346,3 +425,152 @@ class GoogleSheetsService:
             pass
         
         return 0.0
+    
+    def update_distro_data(self, enriched_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Atualiza dados enriquecidos no Google Sheets.
+        
+        Args:
+            enriched_data: Lista de dados enriquecidos pelo GROQ.
+                          Cada item deve ter: name, ram_idle, cpu_score, io_score, requisitos
+        
+        Returns:
+            Dicionário com resultado da operação.
+        """
+        try:
+            service = self._get_sheets_service()
+            
+            # Primeiro, buscar os headers e dados atuais
+            result = service.spreadsheets().values().get(
+                spreadsheetId=self.SHEET_ID,
+                range=f"{self.SHEET_NAME}!A1:Z1000"
+            ).execute()
+            
+            values = result.get('values', [])
+            
+            if not values:
+                return {"error": "Planilha vazia"}
+            
+            # Headers na primeira linha
+            headers = [h.lower().strip() for h in values[0]]
+            
+            # Encontrar índices das colunas que precisamos atualizar
+            try:
+                name_col = headers.index('name')
+                ram_col = headers.index('idle ram usage')
+                cpu_col = headers.index('cpu score') if 'cpu score' in headers else None
+                io_col = headers.index('i/o score') if 'i/o score' in headers else None
+                req_col = headers.index('requirements') if 'requirements' in headers else None
+            except ValueError as e:
+                return {"error": f"Coluna não encontrada: {e}"}
+            
+            # Criar mapa de nome -> índice de linha
+            name_to_row = {}
+            for i, row in enumerate(values[1:], start=2):  # Começa em 2 (linha 1 é header)
+                if len(row) > name_col:
+                    name_to_row[row[name_col].strip().lower()] = i
+            
+            # Preparar atualizações em batch
+            updates = []
+            updated_count = 0
+            errors = []
+            
+            for item in enriched_data:
+                name = item.get('name', '').strip()
+                if not name:
+                    continue
+                
+                # Verificar se há erro no enriquecimento
+                if 'error' in item:
+                    errors.append(f"{name}: {item['error']}")
+                    continue
+                
+                # Encontrar a linha correspondente
+                row_index = name_to_row.get(name.lower())
+                if not row_index:
+                    errors.append(f"{name}: não encontrado na planilha")
+                    continue
+                
+                # Atualizar RAM Idle
+                if 'ram_idle' in item:
+                    col_letter = self._col_number_to_letter(ram_col + 1)
+                    updates.append({
+                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
+                        'values': [[str(item['ram_idle'])]]
+                    })
+                
+                # Atualizar CPU Score
+                if 'cpu_score' in item and cpu_col is not None:
+                    col_letter = self._col_number_to_letter(cpu_col + 1)
+                    updates.append({
+                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
+                        'values': [[str(item['cpu_score'])]]
+                    })
+                
+                # Atualizar I/O Score
+                if 'io_score' in item and io_col is not None:
+                    col_letter = self._col_number_to_letter(io_col + 1)
+                    updates.append({
+                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
+                        'values': [[str(item['io_score'])]]
+                    })
+                
+                # Atualizar Requirements (campo em inglês)
+                if 'requirements' in item and req_col is not None:
+                    col_letter = self._col_number_to_letter(req_col + 1)
+                    updates.append({
+                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
+                        'values': [[str(item['requirements'])]]
+                    })
+                    logger.info(f"Adicionando requirements '{item['requirements']}' para {name}")
+                elif 'requirements' in item and req_col is None:
+                    logger.warning(f"Coluna 'requirements' não encontrada no Sheets para atualizar {name}")
+                elif 'requirements' not in item:
+                    logger.warning(f"Campo 'requirements' não retornado pelo GROQ para {name}")
+                
+                updated_count += 1
+            
+            # Executar todas as atualizações em batch
+            if updates:
+                body = {
+                    'valueInputOption': 'USER_ENTERED',
+                    'data': updates
+                }
+                
+                result = service.spreadsheets().values().batchUpdate(
+                    spreadsheetId=self.SHEET_ID,
+                    body=body
+                ).execute()
+                
+                logger.info(f"Google Sheets atualizado: {updated_count} distros, {result.get('totalUpdatedCells', 0)} células")
+            
+            return {
+                "success": True,
+                "updated": updated_count,
+                "total_cells": result.get('totalUpdatedCells', 0) if updates else 0,
+                "errors": errors if errors else None
+            }
+            
+        except HttpError as e:
+            logger.error(f"Erro HTTP ao atualizar Google Sheets: {e}")
+            return {"error": f"Erro HTTP: {e}"}
+        except Exception as e:
+            logger.error(f"Erro ao atualizar Google Sheets: {e}", exc_info=True)
+            return {"error": str(e)}
+    
+    def _col_number_to_letter(self, col: int) -> str:
+        """
+        Converte número de coluna (1-indexed) para letra (A, B, C, ..., Z, AA, AB, ...).
+        
+        Args:
+            col: Número da coluna (1 = A, 2 = B, etc.)
+        
+        Returns:
+            Letra(s) da coluna.
+        """
+        result = ""
+        while col > 0:
+            col -= 1
+            result = chr(65 + (col % 26)) + result
+            col //= 26
+        return result

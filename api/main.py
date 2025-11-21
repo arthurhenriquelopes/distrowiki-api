@@ -10,8 +10,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 
-from .routes import distros_router, logo_router
+load_dotenv()
+
+from .routes import distros_router, logo_router, enrich_sheets_router
 
 # Configurar logging
 logging.basicConfig(
@@ -97,6 +100,7 @@ app.add_middleware(
 # Registrar rotas
 app.include_router(distros_router)
 app.include_router(logo_router)
+app.include_router(enrich_sheets_router)
 
 
 @app.get("/", tags=["Root"])
