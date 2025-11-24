@@ -31,3 +31,6 @@ Thumbs.db
 # Backups
 *.bak
 *.backup
+.env
+token.json
+credentials.json
