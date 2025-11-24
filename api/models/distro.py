@@ -160,42 +160,6 @@ class DistroMetadata(BaseModel):
         example="https://distrowatch.com/images/yvzhuwbpy/cachyos.png"
     )
     
-    logo_url: Optional[str] = Field(
-        None,
-        description="URL da logo da distribuição (Google Sheets)",
-        example="https://example.com/logo.png"
-    )
-    
-    idle_ram_usage: Optional[str] = Field(
-        None,
-        description="Uso de RAM em idle",
-        example="800 MB"
-    )
-    
-    image_size: Optional[str] = Field(
-        None,
-        description="Tamanho da imagem ISO",
-        example="2.5 GB"
-    )
-    
-    office_suite: Optional[str] = Field(
-        None,
-        description="Suite de escritório incluída",
-        example="LibreOffice"
-    )
-    
-    price: Optional[str] = Field(
-        None,
-        description="Preço em R$ (geralmente gratuito)",
-        example="R$ 0,00"
-    )
-    
-    package_manager: Optional[str] = Field(
-        None,
-        description="Gerenciador de pacotes",
-        example="pacman"
-    )
-    
     # Metadados para compatibilidade (deprecated)
     summary: Optional[str] = Field(
         None,
@@ -219,8 +183,6 @@ class DistroMetadata(BaseModel):
                 "id": "cachyos",
                 "name": "CachyOS",
                 "description": "CachyOS is a Linux distribution based on Arch Linux. It focuses on speed and security optimisations...",
-                "logo": "https://distrowatch.com/images/yvzhuwbpy/cachyos.png",
-                "logo_url": "https://example.com/logos/cachyos.png",
                 "os_type": "Linux",
                 "based_on": "Arch",
                 "family": "arch",
@@ -230,15 +192,9 @@ class DistroMetadata(BaseModel):
                 "desktop_environments": ["kde"],
                 "category": "Desktop, Live Medium",
                 "status": "Active",
-                "idle_ram_usage": "800 MB",
-                "image_size": "2.5 GB",
-                "office_suite": "LibreOffice",
-                "price": "R$ 0,00",
-                "package_manager": "pacman",
                 "ranking": 1,
                 "rating": 8.1,
                 "homepage": "https://cachyos.org/",
-                "latest_release_date": "2024-10-01T00:00:00Z",
                 "last_updated": "2025-11-06T10:00:00Z"
             }
         }

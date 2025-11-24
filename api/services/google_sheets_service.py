@@ -3,7 +3,7 @@ Serviço de integração com Google Sheets.
 
 Busca dados de distribuições Linux diretamente do Google Sheets.
 Utiliza API pública sem autenticação (sheets públicas) para leitura.
-Utiliza OAuth 2.0 para escrita (atualização automática).
+Utiliza Service Account para escrita (atualização).
 """
 
 import logging
@@ -12,18 +12,14 @@ from datetime import datetime
 import httpx
 import os
 import json
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 from ..models.distro import DistroMetadata, DistroFamily, DesktopEnvironment
+
 
 logger = logging.getLogger(__name__)
 
 
 class GoogleSheetsService:
-    """Serviço para buscar dados do Google Sheets."""
+    """Serviço para buscar e atualizar dados do Google Sheets."""
     
     # IDs e configuração
     SHEET_ID = "1ObKRlMRWtABnau6lZTT6en1BajVkV6m2LtLhXEHZ_Zk"
@@ -35,13 +31,6 @@ class GoogleSheetsService:
     # Headers para requisição
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     TIMEOUT = 30.0
-    
-    # OAuth 2.0 Scopes
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-    
-    # Caminhos para credenciais
-    CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
-    TOKEN_FILE = os.getenv('GOOGLE_TOKEN_FILE', 'token.json')
     
     # Mapeamento de famílias
     FAMILY_MAPPING = {
@@ -83,74 +72,14 @@ class GoogleSheetsService:
             headers={"User-Agent": self.USER_AGENT},
             follow_redirects=True,
         )
-        self._sheets_service = None
+        
+        # Credenciais para escrita (opcional - só se existir arquivo)
+        self.credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE")
+        self.access_token = None
     
     async def close(self):
         """Fecha o cliente HTTP."""
         await self.client.aclose()
-    
-    def _get_credentials(self) -> Optional[Credentials]:
-        """
-        Obtém credenciais OAuth 2.0 para acesso ao Google Sheets.
-        
-        Returns:
-            Credentials ou None se não configurado.
-        """
-        creds = None
-        
-        # Verificar se já existe token
-        if os.path.exists(self.TOKEN_FILE):
-            try:
-                creds = Credentials.from_authorized_user_file(self.TOKEN_FILE, self.SCOPES)
-            except Exception as e:
-                logger.warning(f"Erro ao carregar token: {e}")
-        
-        # Se não tem credenciais válidas, fazer login
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    logger.info("Token OAuth renovado com sucesso")
-                except Exception as e:
-                    logger.error(f"Erro ao renovar token: {e}")
-                    creds = None
-            
-            if not creds and os.path.exists(self.CREDENTIALS_FILE):
-                try:
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        self.CREDENTIALS_FILE, self.SCOPES)
-                    creds = flow.run_local_server(port=0)
-                    logger.info("Autenticação OAuth realizada com sucesso")
-                except Exception as e:
-                    logger.error(f"Erro na autenticação OAuth: {e}")
-                    return None
-            
-            # Salvar token para próximas execuções
-            if creds:
-                try:
-                    with open(self.TOKEN_FILE, 'w') as token:
-                        token.write(creds.to_json())
-                    logger.info("Token salvo com sucesso")
-                except Exception as e:
-                    logger.warning(f"Erro ao salvar token: {e}")
-        
-        return creds
-    
-    def _get_sheets_service(self):
-        """
-        Obtém serviço do Google Sheets API com OAuth.
-        
-        Returns:
-            Serviço do Google Sheets API.
-        """
-        if not self._sheets_service:
-            creds = self._get_credentials()
-            if not creds:
-                raise ValueError("Credenciais OAuth não configuradas. Configure credentials.json")
-            
-            self._sheets_service = build('sheets', 'v4', credentials=creds)
-        
-        return self._sheets_service
     
     async def fetch_all_distros(self) -> List[DistroMetadata]:
         """
@@ -269,30 +198,24 @@ class GoogleSheetsService:
             release_date_str = data.get("release date", "").strip()
             release_date = self._parse_date(release_date_str)
             
-            # Criar objeto com todos os campos do Google Sheets
+            # Criar objeto
             distro = DistroMetadata(
                 id=distro_id,
                 name=name,
                 summary=data.get("description", "").strip() or None,
                 description=data.get("description", "").strip() or None,
-                logo=data.get("logo", "").strip() or None,
-                logo_url=data.get("logo url", "").strip() or None,
-                os_type=data.get("os type", "").strip() or None,
+                logo_url=data.get("logo", "").strip() or None,
                 family=family,
                 based_on=base or None,
                 origin=data.get("origin", "").strip() or None,
-                desktop=desktop_str or None,
                 desktop_environments=desktop_environments,
                 category=data.get("category", "").strip() or None,
                 status=data.get("status", "").strip() or None,
-                idle_ram_usage=data.get("idle ram usage", "").strip() or None,
-                image_size=data.get("image size", "").strip() or None,
-                office_suite=data.get("office suite", "").strip() or None,
-                price=data.get("price (r$)", "").strip() or None,
                 latest_release_date=release_date,
                 homepage=data.get("website", "").strip() or None,
                 package_manager=data.get("package management", "").strip() or None,
-                architecture=data.get("architecture", "").strip() or None,
+                architecture=data.get("os type", "").strip() or None,
+                rating=self._parse_rating(data.get("price (r$)", "")),
             )
             
             return distro
@@ -374,14 +297,7 @@ class GoogleSheetsService:
         
         date_str = date_str.strip()
         
-        # Se for apenas um ano (4 dígitos), usar 1º de janeiro daquele ano
-        if date_str.isdigit() and len(date_str) == 4:
-            try:
-                return datetime(int(date_str), 1, 1)
-            except ValueError:
-                pass
-        
-        # Tentar vários formatos completos
+        # Tentar vários formatos
         formats = [
             "%Y-%m-%d",
             "%d/%m/%Y",
@@ -396,6 +312,7 @@ class GoogleSheetsService:
             except ValueError:
                 continue
         
+        logger.warning(f"Não foi possível parsear data: {date_str}")
         return None
     
     def _parse_rating(self, price_str: str) -> float:
@@ -426,151 +343,207 @@ class GoogleSheetsService:
         
         return 0.0
     
-    def update_distro_data(self, enriched_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    # ============================================
+    # MÉTODOS PARA ATUALIZAÇÃO DA PLANILHA
+    # ============================================
+    
+    async def _get_access_token(self) -> str:
         """
-        Atualiza dados enriquecidos no Google Sheets.
-        
-        Args:
-            enriched_data: Lista de dados enriquecidos pelo GROQ.
-                          Cada item deve ter: name, ram_idle, cpu_score, io_score, requisitos
+        Obtém access token usando Service Account credentials.
+        Suporta arquivo local OU variáveis de ambiente (Vercel).
         
         Returns:
-            Dicionário com resultado da operação.
+            Access token válido para Google Sheets API.
         """
         try:
-            service = self._get_sheets_service()
+            from google.oauth2 import service_account
+            import google.auth.transport.requests
             
-            # Primeiro, buscar os headers e dados atuais
-            result = service.spreadsheets().values().get(
-                spreadsheetId=self.SHEET_ID,
-                range=f"{self.SHEET_NAME}!A1:Z1000"
-            ).execute()
+            SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
             
-            values = result.get('values', [])
-            
-            if not values:
-                return {"error": "Planilha vazia"}
-            
-            # Headers na primeira linha
-            headers = [h.lower().strip() for h in values[0]]
-            
-            # Encontrar índices das colunas que precisamos atualizar
-            try:
-                name_col = headers.index('name')
-                ram_col = headers.index('idle ram usage')
-                cpu_col = headers.index('cpu score') if 'cpu score' in headers else None
-                io_col = headers.index('i/o score') if 'i/o score' in headers else None
-                req_col = headers.index('requirements') if 'requirements' in headers else None
-            except ValueError as e:
-                return {"error": f"Coluna não encontrada: {e}"}
-            
-            # Criar mapa de nome -> índice de linha
-            name_to_row = {}
-            for i, row in enumerate(values[1:], start=2):  # Começa em 2 (linha 1 é header)
-                if len(row) > name_col:
-                    name_to_row[row[name_col].strip().lower()] = i
-            
-            # Preparar atualizações em batch
-            updates = []
-            updated_count = 0
-            errors = []
-            
-            for item in enriched_data:
-                name = item.get('name', '').strip()
-                if not name:
-                    continue
-                
-                # Verificar se há erro no enriquecimento
-                if 'error' in item:
-                    errors.append(f"{name}: {item['error']}")
-                    continue
-                
-                # Encontrar a linha correspondente
-                row_index = name_to_row.get(name.lower())
-                if not row_index:
-                    errors.append(f"{name}: não encontrado na planilha")
-                    continue
-                
-                # Atualizar RAM Idle
-                if 'ram_idle' in item:
-                    col_letter = self._col_number_to_letter(ram_col + 1)
-                    updates.append({
-                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
-                        'values': [[str(item['ram_idle'])]]
-                    })
-                
-                # Atualizar CPU Score
-                if 'cpu_score' in item and cpu_col is not None:
-                    col_letter = self._col_number_to_letter(cpu_col + 1)
-                    updates.append({
-                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
-                        'values': [[str(item['cpu_score'])]]
-                    })
-                
-                # Atualizar I/O Score
-                if 'io_score' in item and io_col is not None:
-                    col_letter = self._col_number_to_letter(io_col + 1)
-                    updates.append({
-                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
-                        'values': [[str(item['io_score'])]]
-                    })
-                
-                # Atualizar Requirements (campo em inglês)
-                if 'requirements' in item and req_col is not None:
-                    col_letter = self._col_number_to_letter(req_col + 1)
-                    updates.append({
-                        'range': f"{self.SHEET_NAME}!{col_letter}{row_index}",
-                        'values': [[str(item['requirements'])]]
-                    })
-                    logger.info(f"Adicionando requirements '{item['requirements']}' para {name}")
-                elif 'requirements' in item and req_col is None:
-                    logger.warning(f"Coluna 'requirements' não encontrada no Sheets para atualizar {name}")
-                elif 'requirements' not in item:
-                    logger.warning(f"Campo 'requirements' não retornado pelo GROQ para {name}")
-                
-                updated_count += 1
-            
-            # Executar todas as atualizações em batch
-            if updates:
-                body = {
-                    'valueInputOption': 'USER_ENTERED',
-                    'data': updates
+            # MÉTODO 1: Variáveis de ambiente (Vercel/Produção)
+            if os.getenv("GCP_PRIVATE_KEY"):
+                logger.info("Usando credenciais GCP de variáveis de ambiente")
+                credentials_info = {
+                    "type": "service_account",
+                    "project_id": os.getenv("GCP_PROJECT_ID"),
+                    "private_key": os.getenv("GCP_PRIVATE_KEY").replace('\\n', '\n'),
+                    "client_email": os.getenv("GCP_SERVICE_ACCOUNT_EMAIL"),
+                    "token_uri": "https://oauth2.googleapis.com/token",
                 }
-                
-                result = service.spreadsheets().values().batchUpdate(
-                    spreadsheetId=self.SHEET_ID,
-                    body=body
-                ).execute()
-                
-                logger.info(f"Google Sheets atualizado: {updated_count} distros, {result.get('totalUpdatedCells', 0)} células")
+                creds = service_account.Credentials.from_service_account_info(
+                    credentials_info, scopes=SCOPES
+                )
             
-            return {
-                "success": True,
-                "updated": updated_count,
-                "total_cells": result.get('totalUpdatedCells', 0) if updates else 0,
-                "errors": errors if errors else None
-            }
+            # MÉTODO 2: Arquivo local (Desenvolvimento)
+            elif self.credentials_file and os.path.exists(self.credentials_file):
+                logger.info("Usando credenciais de arquivo local")
+                with open(self.credentials_file, 'r') as f:
+                    credentials_info = json.load(f)
+                creds = service_account.Credentials.from_service_account_info(
+                    credentials_info, scopes=SCOPES
+                )
             
-        except HttpError as e:
-            logger.error(f"Erro HTTP ao atualizar Google Sheets: {e}")
-            return {"error": f"Erro HTTP: {e}"}
+            else:
+                raise ValueError(
+                    "Credenciais não encontradas. Configure:\n"
+                    "- Local: GOOGLE_CREDENTIALS_FILE=credentials.json\n"
+                    "- Vercel: GCP_PRIVATE_KEY, GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_EMAIL"
+                )
+            
+            # Obter token
+            request = google.auth.transport.requests.Request()
+            creds.refresh(request)
+            
+            return creds.token
+            
         except Exception as e:
-            logger.error(f"Erro ao atualizar Google Sheets: {e}", exc_info=True)
-            return {"error": str(e)}
+            logger.error(f"Erro ao obter access token: {e}")
+            raise
     
-    def _col_number_to_letter(self, col: int) -> str:
+
+    async def update_enriched_data(
+        self, 
+        enriched_data: List[Dict[str, Any]], 
+        fields: List[Any]
+    ) -> Dict[str, Any]:
         """
-        Converte número de coluna (1-indexed) para letra (A, B, C, ..., Z, AA, AB, ...).
+        Atualiza a planilha com os dados enriquecidos via Google Sheets API v4.
         
         Args:
-            col: Número da coluna (1 = A, 2 = B, etc.)
+            enriched_data: Lista de dicionários com dados enriquecidos
+            fields: Lista de SheetColumn enums que foram enriquecidos
         
         Returns:
-            Letra(s) da coluna.
+            dict com informações sobre a atualização
+        """
+        try:
+            # Obter access token
+            access_token = await self._get_access_token()
+            
+            # Headers com autenticação
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # 1. Buscar header da planilha (primeira linha)
+            range_header = f"{self.SHEET_NAME}!1:1"
+            url_get_header = f"{self.SHEETS_API_URL}/{self.SHEET_ID}/values/{range_header}"
+            
+            response = await self.client.get(url_get_header, headers=headers)
+            response.raise_for_status()
+            
+            header_data = response.json()
+            headers_row = header_data.get('values', [[]])[0]
+            
+            # Criar mapeamento de coluna para índice
+            column_map = {header: idx for idx, header in enumerate(headers_row)}
+            
+            # 2. Buscar coluna Name para encontrar linhas
+            range_names = f"{self.SHEET_NAME}!A:A"
+            url_get_names = f"{self.SHEETS_API_URL}/{self.SHEET_ID}/values/{range_names}"
+            
+            response = await self.client.get(url_get_names, headers=headers)
+            response.raise_for_status()
+            
+            names_data = response.json()
+            names_column = names_data.get('values', [])
+            
+            # Criar mapeamento de nome para linha
+            name_to_row = {}
+            for idx, row in enumerate(names_column):
+                if row and len(row) > 0:
+                    name_to_row[row[0]] = idx + 1  # Sheets usa índice base 1
+            
+            # 3. Preparar dados para batch update
+            batch_data = []
+            updates_count = 0
+            errors = []
+            
+            for enriched_item in enriched_data:
+                if 'error' in enriched_item:
+                    errors.append(enriched_item)
+                    continue
+                
+                distro_name = enriched_item.get('Name')
+                if not distro_name or distro_name not in name_to_row:
+                    logger.warning(f"Distro não encontrada na planilha: {distro_name}")
+                    continue
+                
+                row_number = name_to_row[distro_name]
+                
+                # Para cada campo enriquecido
+                for field in fields:
+                    field_value = field.value  # Nome da coluna (ex: "Idle RAM Usage")
+                    
+                    if field_value in enriched_item and field_value in column_map:
+                        col_idx = column_map[field_value]
+                        col_letter = self._get_column_letter(col_idx)
+                        cell_range = f"{self.SHEET_NAME}!{col_letter}{row_number}"
+                        value = enriched_item[field_value]
+                        
+                        batch_data.append({
+                            'range': cell_range,
+                            'values': [[value]]
+                        })
+                        updates_count += 1
+            
+            # 4. Executar batch update
+            if batch_data:
+                url_batch_update = f"{self.SHEETS_API_URL}/{self.SHEET_ID}/values:batchUpdate"
+                
+                payload = {
+                    'valueInputOption': 'USER_ENTERED',
+                    'data': batch_data
+                }
+                
+                response = await self.client.post(
+                    url_batch_update,
+                    json=payload,
+                    headers=headers
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                logger.info(f"Planilha atualizada: {updates_count} células")
+                
+                return {
+                    'success': True,
+                    'updated_cells': result.get('totalUpdatedCells', 0),
+                    'updated_ranges': len(batch_data),
+                    'message': f'{updates_count} células atualizadas com sucesso',
+                    'errors': errors if errors else None
+                }
+            else:
+                return {
+                    'success': False,
+                    'message': 'Nenhum dado para atualizar',
+                    'errors': errors if errors else None
+                }
+                
+        except Exception as e:
+            logger.error(f"Erro ao atualizar planilha: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': str(e),
+                'message': f'Erro ao atualizar planilha: {str(e)}'
+            }
+
+    @staticmethod
+    def _get_column_letter(col_idx: int) -> str:
+        """
+        Converte índice numérico para letra de coluna (0 -> A, 1 -> B, etc.).
+        
+        Args:
+            col_idx: Índice da coluna (base 0).
+        
+        Returns:
+            Letra da coluna.
         """
         result = ""
-        while col > 0:
-            col -= 1
-            result = chr(65 + (col % 26)) + result
-            col //= 26
+        while col_idx >= 0:
+            result = chr(col_idx % 26 + 65) + result
+            col_idx = col_idx // 26 - 1
         return result
