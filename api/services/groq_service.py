@@ -5,7 +5,6 @@ from enum import Enum
 import json
 import re
 
-
 # Enum com campos da planilha que podem ser enriquecidos via IA
 class SheetColumn(str, Enum):
     DESCRIPTION = "Description"
@@ -22,9 +21,10 @@ class SheetColumn(str, Enum):
     ORIGIN = "Origin"
     STATUS = "Status"
     PACKAGE_MANAGEMENT = "Package Management"
+    RELEASE_DATE = "Release Date"
+    LATEST_RELEASE = "Latest Release"
 
-
-# Descrições para o prompt da IA (instruções específicas)
+# Descrições para o prompt da IA
 FIELD_PROMPTS = {
     SheetColumn.DESCRIPTION: "uma descrição concisa em português da distribuição (máx. 200 caracteres)",
     SheetColumn.IDLE_RAM_USAGE: "uso de RAM em idle em MB (apenas o número)",
@@ -39,13 +39,13 @@ FIELD_PROMPTS = {
     SheetColumn.BASE: "distribuição base (Debian, Arch, Independent, etc.)",
     SheetColumn.ORIGIN: "país de origem",
     SheetColumn.STATUS: "status: Active, Discontinued, Beta",
-    SheetColumn.PACKAGE_MANAGEMENT: "gerenciador de pacotes principal (apt, pacman, dnf, etc.)"
+    SheetColumn.PACKAGE_MANAGEMENT: "gerenciador de pacotes principal (apt, pacman, dnf, etc.)",
+    SheetColumn.RELEASE_DATE: "data do lançamento original da distribuição no formato DD/MM/AAAA",
+    SheetColumn.LATEST_RELEASE: "data da última versão lançada no formato DD/MM/AAAA"
 }
 
-
-GROQ_API_KEYS = os.getenv("GROQ_API_KEYS", os.getenv("GROQ_API_KEY", "")).split(",")
-GROQ_API_KEYS = [key.strip() for key in GROQ_API_KEYS if key.strip()]
-
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").split(",")
+GROQ_API_KEY = [key.strip() for key in GROQ_API_KEY if key.strip()]
 
 async def enrich_distros_with_groq(
     distro_names: List[str], 
@@ -58,7 +58,6 @@ async def enrich_distros_with_groq(
         distro_names: Lista de nomes das distribuições
         fields: Lista de colunas da planilha para enriquecer. Se None, usa campos padrão.
     """
-    # Campos padrão se nenhum for especificado
     if fields is None or len(fields) == 0:
         fields = [
             SheetColumn.IDLE_RAM_USAGE,
@@ -69,7 +68,6 @@ async def enrich_distros_with_groq(
     
     results = []
     for name in distro_names:
-        # Constrói o prompt dinamicamente baseado nas colunas selecionadas
         field_lines = [
             f'  "{field.value}": {FIELD_PROMPTS[field]}'
             for field in fields
@@ -83,7 +81,7 @@ async def enrich_distros_with_groq(
         )
         
         success = False
-        for api_key in GROQ_API_KEYS:
+        for api_key in GROQ_API_KEY:
             groq_client = Groq(api_key=api_key)
             try:
                 response = groq_client.chat.completions.create(
@@ -94,11 +92,8 @@ async def enrich_distros_with_groq(
                 )
                 
                 content = response.choices[0].message.content
+                content = re.sub(r'```json|```', '', content).strip()
                 
-                # Remove markdown code blocks se existirem (usando regex correto)
-                content = re.sub(r'```\s*', '', content, flags=re.DOTALL)
-                
-                # Busca o JSON
                 match = re.search(r'\{.*\}', content, re.DOTALL)
                 if match:
                     enriched = json.loads(match.group())
@@ -109,7 +104,6 @@ async def enrich_distros_with_groq(
                 success = True
                 break
             except Exception as e:
-                # Se erro de quota/limite, tenta próxima chave
                 error_message = str(e).lower()
                 if 'quota' in error_message or 'limit' in error_message or 'rate' in error_message:
                     continue

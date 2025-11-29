@@ -146,10 +146,10 @@ async def enrich_specific_distros_auto_endpoint(
         await sheets_service.close()
 
 
-# Endpoints públicos (sem proteção)
+# Endpoints públicos
 @router.get("/available-columns")
 async def get_available_columns():
-    """✅ PÚBLICO: Retorna colunas disponíveis."""
+    """✅ PÚBLICO: Retorna colunas disponíveis para enriquecimento."""
     return {
         "columns": [
             {"name": field.value, "key": field.name, "prompt_instruction": FIELD_PROMPTS[field]} 
@@ -159,10 +159,9 @@ async def get_available_columns():
         "default_fields": ["Idle RAM Usage", "CPU Score", "I/O Score", "Requirements"]
     }
 
-
 @router.get("/column-groups")
 async def get_column_groups():
-    """✅ PÚBLICO: Retorna grupos pré-definidos."""
+    """✅ PÚBLICO: Retorna grupos pré-definidos de colunas."""
     return {
         "groups": {
             "performance": {
@@ -171,11 +170,15 @@ async def get_column_groups():
             },
             "basic_info": {
                 "label": "Informações Básicas",
-                "columns": ["Description", "Category", "OS Type", "Status"]
+                "columns": ["Description", "Category", "OS Type", "Status", "Origin"]
             },
             "technical": {
                 "label": "Detalhes Técnicos",
                 "columns": ["Base", "Desktop", "Package Management", "Office Suite"]
+            },
+            "dates": {
+                "label": "Datas e Lançamentos",
+                "columns": ["Release Date", "Latest Release"]
             }
         }
     }

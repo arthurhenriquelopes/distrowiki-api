@@ -8,65 +8,50 @@ conforme especificado no Módulo 1.
 from datetime import datetime
 from typing import List, Optional
 from enum import Enum
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class DistroFamily(str, Enum):
     """Família/base da distribuição Linux."""
-    DEBIAN = "debian"
-    UBUNTU = "ubuntu"
-    FEDORA = "fedora"
-    ARCH = "arch"
-    OPENSUSE = "opensuse"
-    GENTOO = "gentoo"
-    SLACKWARE = "slackware"
-    INDEPENDENT = "independent"
-    OTHER = "other"
+    DEBIAN = "Debian"
+    UBUNTU = "Ubuntu"
+    FEDORA = "Fedora"
+    ARCH = "Arch"
+    OPENSUSE = "openSUSE"
+    GENTOO = "Gentoo"
+    SLACKWARE = "Slackware"
+    INDEPENDENT = "Independent"
+    OTHER = "Other"
 
 
 class DesktopEnvironment(str, Enum):
     """Ambientes de desktop disponíveis."""
-    GNOME = "gnome"
-    KDE = "kde"
-    XFCE = "xfce"
-    MATE = "mate"
-    CINNAMON = "cinnamon"
-    LXDE = "lxde"
-    LXQT = "lxqt"
-    BUDGIE = "budgie"
-    PANTHEON = "pantheon"
-    DEEPIN = "deepin"
+    GNOME = "GNOME"
+    KDE = "KDE Plasma"
+    XFCE = "Xfce"
+    MATE = "MATE"
+    CINNAMON = "Cinnamon"
+    LXDE = "LXDE"
+    LXQT = "LXQt"
+    BUDGIE = "Budgie"
+    PANTHEON = "Pantheon"
+    DEEPIN = "Deepin"
     I3 = "i3"
-    SWAY = "sway"
-    CUSTOM = "custom"
-    OTHER = "other"
+    SWAY = "Sway"
+    CUSTOM = "Custom"
+    OTHER = "Other"
 
 
 class DistroMetadata(BaseModel):
     """
-    Metadados de uma distribuição Linux extraídos do DistroWatch.
+    Metadados de uma distribuição Linux.
     
-    Campos principais:
-    - id: identificador único (slug do DistroWatch)
-    - name: nome da distribuição
-    - description: descrição completa da distribuição
-    - os_type: tipo do sistema (Linux, BSD, etc)
-    - based_on: distribuição base
-    - family: família/base da distro (enum)
-    - origin: país de origem
-    - architecture: arquiteturas suportadas
-    - desktop: ambiente desktop principal
-    - desktop_environments: lista de DEs disponíveis
-    - category: categorias (Desktop, Server, etc)
-    - status: status (Active, Dormant, etc)
-    - ranking: posição no ranking do DistroWatch
-    - rating: avaliação média dos usuários
-    - homepage: site oficial
+    Inclui dados enriquecidos via IA do Google Sheets.
     """
     
     id: str = Field(
         ...,
-        description="Identificador único da distribuição (slug do DistroWatch)",
+        description="Identificador único da distribuição",
         example="cachyos"
     )
     
@@ -96,8 +81,8 @@ class DistroMetadata(BaseModel):
     
     family: DistroFamily = Field(
         DistroFamily.INDEPENDENT,
-        description="Família/base da distribuição (determinada automaticamente)",
-        example="arch"
+        description="Família/base da distribuição",
+        example="Arch"
     )
     
     origin: Optional[str] = Field(
@@ -109,42 +94,36 @@ class DistroMetadata(BaseModel):
     architecture: Optional[str] = Field(
         None,
         description="Arquiteturas suportadas",
-        example="x86_64, x86-64-v3"
-    )
-    
-    desktop: Optional[str] = Field(
-        None,
-        description="Ambiente desktop principal",
-        example="KDE Plasma"
+        example="x86_64, ARM64"
     )
     
     desktop_environments: List[DesktopEnvironment] = Field(
         default_factory=list,
         description="Lista de ambientes gráficos disponíveis",
-        example=["kde", "gnome"]
+        example=["KDE Plasma", "GNOME"]
     )
     
     category: Optional[str] = Field(
         None,
-        description="Categorias da distribuição",
-        example="Desktop, Live Medium"
+        description="Categoria principal da distribuição",
+        example="Desktop/Gaming"
     )
     
     status: Optional[str] = Field(
         None,
-        description="Status da distribuição",
+        description="Status de desenvolvimento",
         example="Active"
     )
     
     ranking: Optional[int] = Field(
         None,
-        description="Posição no ranking do DistroWatch (menor = mais popular)",
+        description="Posição no ranking do DistroWatch",
         example=1
     )
     
     rating: Optional[float] = Field(
         None,
-        description="Avaliação média dos usuários (0-10)",
+        description="Avaliação média (0-10)",
         example=8.1
     )
     
@@ -156,24 +135,71 @@ class DistroMetadata(BaseModel):
     
     logo: Optional[str] = Field(
         None,
-        description="URL da logo da distribuição no DistroWatch",
-        example="https://distrowatch.com/images/yvzhuwbpy/cachyos.png"
+        description="URL da logo da distribuição",
+        example="https://distrowatch.com/images/cachyos.png"
     )
     
-    # Metadados para compatibilidade (deprecated)
+    # ====== CAMPOS DE PERFORMANCE (Enriquecidos via IA) ======
+    
+    idle_ram_usage: Optional[int] = Field(
+        None,
+        description="Uso de RAM em idle (MB)",
+        example=800
+    )
+    
+    cpu_score: Optional[int] = Field(
+        None,
+        description="Score de performance de CPU (1-10)",
+        example=8
+    )
+    
+    io_score: Optional[int] = Field(
+        None,
+        description="Score de performance de I/O (1-10)",
+        example=9
+    )
+    
+    requirements: Optional[str] = Field(
+        None,
+        description="Requisitos de hardware: Leve, Médio ou Alto",
+        example="Médio"
+    )
+    
+    package_management: Optional[str] = Field(
+        None,
+        description="Gerenciador de pacotes principal",
+        example="pacman"
+    )
+    
+    image_size: Optional[float] = Field(
+        None,
+        description="Tamanho típico da ISO em GB",
+        example=2.5
+    )
+    
+    office_suite: Optional[str] = Field(
+        None,
+        description="Suite de escritório incluída",
+        example="LibreOffice"
+    )
+    
+    # ====== FIM CAMPOS DE PERFORMANCE ======
+    
     summary: Optional[str] = Field(
         None,
-        description="[DEPRECATED] Use 'description' - Resumo breve",
+        description="[DEPRECATED] Use 'description'",
     )
     
-    latest_release_date: Optional[datetime] = Field(
+    latest_release_date: Optional[str] = Field(
         None,
-        description="Data do último lançamento estável",
+        description="Data da última versão lançada (formato DD/MM/AAAA)",
+        example="24/11/2025"
     )
     
-    last_updated: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="Timestamp da última atualização dos dados"
+    release_year: Optional[int] = Field(
+        None,
+        description="Ano de lançamento original da distribuição",
+        example=2021
     )
     
     class Config:
@@ -182,30 +208,26 @@ class DistroMetadata(BaseModel):
             "example": {
                 "id": "cachyos",
                 "name": "CachyOS",
-                "description": "CachyOS is a Linux distribution based on Arch Linux. It focuses on speed and security optimisations...",
+                "description": "Arch-based distribution optimized for performance",
                 "os_type": "Linux",
-                "based_on": "Arch",
-                "family": "arch",
-                "origin": "Germany",
-                "architecture": "x86_64, x86-64-v3",
-                "desktop": "KDE Plasma",
-                "desktop_environments": ["kde"],
-                "category": "Desktop, Live Medium",
-                "status": "Active",
-                "ranking": 1,
-                "rating": 8.1,
-                "homepage": "https://cachyos.org/",
-                "last_updated": "2025-11-06T10:00:00Z"
+                "family": "Arch",
+                "category": "Desktop/Performance",
+                "desktop_environments": ["KDE Plasma"],
+                "idle_ram_usage": 800,
+                "cpu_score": 9,
+                "io_score": 9,
+                "requirements": "Médio",
+                "package_management": "pacman",
+                "image_size": 2.5,
+                "latest_release_date": "15/11/2025",
+                "release_year": 2021,
+                "homepage": "https://cachyos.org/"
             }
         }
 
 
 class DistroListResponse(BaseModel):
-    """
-    Resposta do endpoint GET /distros.
-    
-    Inclui lista de distribuições e metadados de paginação.
-    """
+    """Resposta do endpoint GET /distros."""
     
     distros: List[DistroMetadata] = Field(
         ...,
@@ -215,7 +237,7 @@ class DistroListResponse(BaseModel):
     total: int = Field(
         ...,
         description="Total de distribuições disponíveis",
-        example=50
+        example=81
     )
     
     page: int = Field(
@@ -234,25 +256,3 @@ class DistroListResponse(BaseModel):
         None,
         description="Timestamp do cache utilizado"
     )
-    
-    class Config:
-        """Configuração do modelo Pydantic."""
-        json_schema_extra = {
-            "example": {
-                "distros": [
-                    {
-                        "id": "ubuntu",
-                        "name": "Ubuntu",
-                        "summary": "Distribuição Linux baseada em Debian",
-                        "family": "debian",
-                        "desktop_environments": ["gnome"],
-                        "latest_release_date": "2024-10-01T00:00:00Z",
-                        "homepage": "https://ubuntu.com"
-                    }
-                ],
-                "total": 50,
-                "page": 1,
-                "page_size": 20,
-                "cache_timestamp": "2025-11-06T10:00:00Z"
-            }
-        }

@@ -24,8 +24,8 @@ def get_api_key(api_key: str = Security(API_KEY_HEADER)) -> str:
     Raises:
         HTTPException: Se API Key inválida ou ausente
     """
-    # Buscar API Keys válidas do ambiente
-    valid_keys = os.getenv("API_KEYS", "").split(",")
+    # Buscar API Key(s) válidas do ambiente
+    valid_keys = os.getenv("API_KEY", "").split(",")
     valid_keys = [key.strip() for key in valid_keys if key.strip()]
     
     if not valid_keys:
