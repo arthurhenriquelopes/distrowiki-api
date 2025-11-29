@@ -6,7 +6,6 @@ import logging
 import os
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Query, Header
 
 from ..models.distro import DistroMetadata, DistroListResponse
@@ -140,6 +139,7 @@ async def get_distro_by_id(
 )
 async def refresh_distros_cache(
     api_key: str = Header(..., alias="X-API-Key", description="API Key para autenticação"),
+    cache_manager: CacheManager = Depends(get_cache_manager)
 ):
     """
     Remove o cache de distros forçando nova busca nos próximos requests.
@@ -161,75 +161,15 @@ async def refresh_distros_cache(
         )
     
     try:
-        # Deletar cache de distros usando Path diretamente
-        cache_file = Path("data/cache/distro_cache.json")
-        
-        if cache_file.exists():
-            cache_file.unlink()
-            logger.info(f"Cache de distros removido: {cache_file}")
-            return {
-                "success": True,
-                "message": "Cache removido com sucesso",
-                "cache_file": str(cache_file),
-                "timestamp": datetime.utcnow().isoformat(),
-                "next_request": "Próximo GET /distros irá buscar dados atualizados do Sheets"
-            }
-        else:
-            return {
-                "success": True,
-                "message": "Cache já estava vazio",
-                "cache_file": str(cache_file),
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            
-    except Exception as e:
-        logger.error(f"Erro ao remover cache: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao remover cache: {str(e)}"
-        )
+        cache_manager.clear_cache()
 
-
-@router.delete("/cache/distros",
-    summary="Remove cache de distros (público com confirmação)",
-    response_model=Dict[str, Any]
-)
-async def clear_distros_cache(
-    confirm: bool = Query(False, description="Confirmar remoção do cache"),
-):
-    """
-    Remove o cache de distros se confirm=true.
-    
-    **Uso:**
-    ```
-    curl -X DELETE 'http://localhost:8000/cache/distros?confirm=true'
-    ```
-    """
-    if not confirm:
-        raise HTTPException(
-            status_code=400,
-            detail="Adicione ?confirm=true para confirmar a remoção do cache"
-        )
-    
-    try:
-        # Deletar cache usando Path diretamente
-        cache_file = Path("data/cache/distro_cache.json")
-        
-        if cache_file.exists():
-            cache_file.unlink()
-            logger.info(f"Cache removido via endpoint público: {cache_file}")
-            return {
-                "success": True,
-                "message": "Cache removido com sucesso",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        
         return {
             "success": True,
-            "message": "Cache já estava vazio",
-            "timestamp": datetime.utcnow().isoformat()
+            "message": "Comando de limpeza de cache enviado com sucesso",
+            "timestamp": datetime.utcnow().isoformat(),
+            "next_request": "Próximo GET /distros irá buscar dados atualizados"
         }
-        
+
     except Exception as e:
         logger.error(f"Erro ao remover cache: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
