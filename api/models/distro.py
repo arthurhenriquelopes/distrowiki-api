@@ -38,6 +38,7 @@ class DesktopEnvironment(str, Enum):
     DEEPIN = "Deepin"
     I3 = "i3"
     SWAY = "Sway"
+    NONE = "None"
     CUSTOM = "Custom"
     OTHER = "Other"
 
