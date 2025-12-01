@@ -26,6 +26,8 @@ class SheetColumn(str, Enum):
     PACKAGE_MANAGEMENT = "Package Management"
     RELEASE_DATE = "Release Date"
     LATEST_RELEASE = "Latest Release"
+    WEBSITE = "Website"
+    PRICE = "Price (R$)" 
 
 # Descrições para o prompt da IA
 FIELD_PROMPTS = {
@@ -64,6 +66,8 @@ FIELD_PROMPTS = {
     SheetColumn.PACKAGE_MANAGEMENT: "gerenciador de pacotes principal (apt, pacman, dnf, etc.)",
     SheetColumn.RELEASE_DATE: "data do lançamento original da distribuição no formato DD/MM/AAAA",
     SheetColumn.LATEST_RELEASE: "data da última versão lançada no formato DD/MM/AAAA",
+    SheetColumn.WEBSITE: "URL completa da homepage oficial da distribuição linux.",
+    SheetColumn.PRICE: "modelo de preço: 'Gratuito', 'Pago', 'Freemium' ou 'Doações' (a maioria é Gratuito)",
 }
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").split(",")
@@ -99,7 +103,7 @@ def validate_ram_idle(distro_name: str, desktop_env: str, ram_value: int) -> int
     }
 
     # Distros especiais que sempre têm consumo alto
-    gaming_distros = ['holoiso', 'garuda', 'nobara', 'popos', 'cachyos', 'deepin', 'steamos', 'endeavouros']
+    gaming_distros = ['holoiso', 'garuda', 'nobara', 'popos', 'cachyos', 'deepin', 'steamos', 'endeavouros', 'regataos']
 
     de_lower = desktop_env.lower() if desktop_env else ''
     min_ram, max_ram = de_ranges.get(de_lower, (600, 1200))  # Default médio
