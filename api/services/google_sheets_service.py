@@ -31,7 +31,7 @@ def _parse_float(value: str) -> Optional[float]:
         return float(clean)
     except:
         return None
-    
+
 def _parse_size_to_gb(value: str) -> Optional[float]:
     """
     Parse de tamanho de imagem para GB.
@@ -71,13 +71,13 @@ def _parse_size_to_gb(value: str) -> Optional[float]:
 
 class GoogleSheetsService:
     """Serviço para buscar e atualizar dados do Google Sheets."""
-    
+
     SHEET_ID = "1ObKRlMRWtABnau6lZTT6en1BajVkV6m2LtLhXEHZ_Zk"
     SHEET_NAME = "distrowiki_complete"
     SHEETS_API_URL = "https://sheets.googleapis.com/v4/spreadsheets"
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     TIMEOUT = 30.0
-    
+
     FAMILY_MAPPING = {
         "debian": DistroFamily.DEBIAN,
         "ubuntu": DistroFamily.UBUNTU,
@@ -92,7 +92,7 @@ class GoogleSheetsService:
         "slackware": DistroFamily.SLACKWARE,
         "independent": DistroFamily.INDEPENDENT,
     }
-    
+
     DE_MAPPING = {
         "gnome": DesktopEnvironment.GNOME,
         "kde": DesktopEnvironment.KDE,
@@ -108,7 +108,7 @@ class GoogleSheetsService:
         "i3": DesktopEnvironment.I3,
         "sway": DesktopEnvironment.SWAY,
     }
-    
+
     def __init__(self):
         self.client = httpx.AsyncClient(
             timeout=self.TIMEOUT,
@@ -117,10 +117,10 @@ class GoogleSheetsService:
         )
         self.credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE")
         self.access_token = None
-    
+
     async def close(self):
         await self.client.aclose()
-    
+
     async def fetch_all_distros(self) -> List[DistroMetadata]:
         try:
             logger.info(f"Buscando dados de Google Sheets...")
@@ -128,13 +128,13 @@ class GoogleSheetsService:
             response = await self.client.get(csv_url)
             response.raise_for_status()
             lines = response.text.strip().split('\n')
-            
+
             if len(lines) < 2:
                 return []
-            
+
             headers = self._parse_csv_line(lines[0])
             distros = []
-            
+
             for line in lines[1:]:
                 if not line.strip():
                     continue
@@ -145,18 +145,18 @@ class GoogleSheetsService:
                         distros.append(distro)
                 except Exception as e:
                     logger.warning(f"Erro: {e}")
-            
+
             logger.info(f"Total de {len(distros)} distribuições processadas")
             return distros
         except Exception as e:
             logger.error(f"Erro: {e}", exc_info=True)
             raise
-    
+
     def _parse_csv_line(self, line: str) -> List[str]:
         values = []
         current = ""
         in_quotes = False
-        
+
         for char in line:
             if char == '"':
                 in_quotes = not in_quotes
@@ -167,24 +167,24 @@ class GoogleSheetsService:
                 current += char
         values.append(current.strip().strip('"'))
         return values
-    
+
     def _parse_distro_row(self, headers: List[str], row_data: List[str]) -> Optional[DistroMetadata]:
         try:
             data = {}
             for i, header in enumerate(headers):
                 if i < len(row_data):
                     data[header.lower().strip()] = row_data[i].strip()
-            
+
             name = data.get("name", "").strip()
             if not name:
                 return None
-            
+
             distro_id = data.get("distro id", "").strip() or self._normalize_id(name)
             base = data.get("base", "").strip() or data.get("os type", "").strip()
             family = self._map_family(base)
             desktop_str = data.get("desktop", "").strip()
             desktop_environments = self._parse_desktop_environments(desktop_str)
-            
+
             # ====== DATAS ======
             latest_release_str = data.get("latest release", "").strip()
             release_date_str = data.get("release date", "").strip()
@@ -211,7 +211,7 @@ class GoogleSheetsService:
                             release_year = parsed_date.year
                 except:
                     pass
-            
+
             idle_ram = _parse_int(data.get("idle ram usage", ""))
             cpu_score = _parse_int(data.get("cpu score", ""))
             io_score = _parse_int(data.get("i/o score", ""))
@@ -219,7 +219,7 @@ class GoogleSheetsService:
             package_mgmt = data.get("package management", "").strip() or None
             image_size = _parse_size_to_gb(data.get("image size", ""))
             office_suite = data.get("office suite", "").strip() or None
-            
+
             return DistroMetadata(
                 id=distro_id,
                 name=name,
@@ -249,10 +249,10 @@ class GoogleSheetsService:
         except Exception as e:
             logger.warning(f"Erro ao parsear: {e}")
             return None
-    
+
     def _normalize_id(self, name: str) -> str:
         return name.lower().replace(" ", "-").replace("/", "-")
-    
+
     def _map_family(self, family_str: str) -> str:
         if not family_str:
             return DistroFamily.INDEPENDENT
@@ -261,7 +261,7 @@ class GoogleSheetsService:
             if key in family_lower:
                 return value
         return DistroFamily.INDEPENDENT
-    
+
     def _parse_desktop_environments(self, desktop_str: str) -> List[str]:
         if not desktop_str:
             return []
@@ -274,7 +274,7 @@ class GoogleSheetsService:
                         des.append(value)
                     break
         return des
-    
+
     def _parse_date(self, date_str: str) -> Optional[datetime]:
         if not date_str:
             return None
@@ -286,7 +286,7 @@ class GoogleSheetsService:
             except ValueError:
                 continue
         return None
-    
+
     def _parse_rating(self, price_str: str) -> float:
         if not price_str:
             return 0.0
@@ -301,7 +301,7 @@ class GoogleSheetsService:
         except:
             pass
         return 0.0
-    
+
     async def _get_access_token(self) -> str:
         try:
             from google.oauth2 import service_account
@@ -328,26 +328,26 @@ class GoogleSheetsService:
         except Exception as e:
             logger.error(f"Erro: {e}")
             raise
-    
+
     async def update_enriched_data(self, enriched_data: List[Dict[str, Any]], fields: List[Any]) -> Dict[str, Any]:
         try:
             access_token = await self._get_access_token()
             headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-            
+
             range_header = f"{self.SHEET_NAME}!1:1"
             url_get_header = f"{self.SHEETS_API_URL}/{self.SHEET_ID}/values/{range_header}"
             response = await self.client.get(url_get_header, headers=headers)
             response.raise_for_status()
             headers_row = response.json().get('values', [[]])[0]
             column_map = {header: idx for idx, header in enumerate(headers_row)}
-            
+
             range_names = f"{self.SHEET_NAME}!A:A"
             url_get_names = f"{self.SHEETS_API_URL}/{self.SHEET_ID}/values/{range_names}"
             response = await self.client.get(url_get_names, headers=headers)
             response.raise_for_status()
             names_column = response.json().get('values', [])
             name_to_row = {row[0]: idx + 1 for idx, row in enumerate(names_column) if row and len(row) > 0}
-            
+
             batch_data = []
             for enriched_item in enriched_data:
                 if 'error' in enriched_item:
@@ -362,17 +362,21 @@ class GoogleSheetsService:
                         col_idx = column_map[field_value]
                         col_letter = self._get_column_letter(col_idx)
                         batch_data.append({'range': f"{self.SHEET_NAME}!{col_letter}{row_number}", 'values': [[enriched_item[field_value]]]})
-            
+
             if batch_data:
                 url_batch_update = f"{self.SHEETS_API_URL}/{self.SHEET_ID}/values:batchUpdate"
-                response = await self.client.post(url_batch_update, json={'valueInputOption': 'USER_ENTERED', 'data': batch_data}, headers=headers)
+                response = await self.client.post(
+                    url_batch_update,
+                    json={"valueInputOption": "RAW", "data": batch_data},
+                    headers=headers,
+                )
                 response.raise_for_status()
                 return {'success': True, 'updated_cells': len(batch_data)}
             return {'success': False, 'message': 'Nenhum dado para atualizar'}
         except Exception as e:
             logger.error(f"Erro: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
-    
+
     @staticmethod
     def _get_column_letter(col_idx: int) -> str:
         result = ""

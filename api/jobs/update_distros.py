@@ -14,7 +14,7 @@ from pathlib import Path
 # Adicionar diretório raiz ao path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from api.services.distrowatch_service import DistroWatchService
+from api.services.release_scraper import DistroWatchService
 from api.cache.cache_manager import get_cache_manager
 from api.models.distro import DistroMetadata
 

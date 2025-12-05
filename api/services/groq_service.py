@@ -31,27 +31,8 @@ class SheetColumn(str, Enum):
 
 # Descrições para o prompt da IA
 FIELD_PROMPTS = {
-    SheetColumn.DESCRIPTION: "uma descrição concisa em português da distribuição (máx. 200 caracteres)",
-    SheetColumn.IDLE_RAM_USAGE: (
-        "Analise a distribuição Linux e, levando em conta o ambiente gráfico, forneça um valor "
-        "realista de uso de RAM em idle em MB (APENAS o número, inteiro). CONTEXTO E FAIXAS REALISTAS:\n"
-        "- Lightweight (LXDE, LXQt, Xfce, i3, Openbox): 300-600 MB\n"
-        "- Medium (MATE, Cinnamon, Budgie): 600-900 MB\n"
-        "- Heavy (GNOME, KDE Plasma, Pantheon): 800-1500 MB\n"
-        "- Gaming/specialized (Steam Deck, HoloISO, Garuda): 1200-2500 MB\n"
-        "- Enterprise/server (RHEL, Ubuntu Server - minimal install): 200-400 MB\n\n"
-        "EXAMPLES:\n"
-        "- Ubuntu (GNOME): ~1200 MB\n"
-        "- Fedora (GNOME): ~1300 MB\n"
-        "- KDE Neon: ~1100 MB\n"
-        "- Pop!_OS (GNOME): ~1400 MB\n"
-        "- Linux Mint (Cinnamon): ~800 MB\n"
-        "- Manjaro (KDE): ~900 MB\n"
-        "- Arch (i3): ~350 MB\n"
-        "- Lubuntu (LXQt): ~450 MB\n\n"
-        "Com base na categoria da distro e no ambiente gráfico, retorne SOMENTE um número inteiro em MB (ex: 1200). "
-        "Não retorne texto, unidades ou valores abaixo de 300 MB para distribuições desktop."
-    ),
+    SheetColumn.DESCRIPTION: "uma descrição concisa em português da distribuição. Deve realçar o diferencial da distribuição, onde é mais aplicada, etc. (máx. 200 caracteres)",
+    SheetColumn.IDLE_RAM_USAGE: ( "Analise a distribuição Linux e, levando em conta o ambiente gráfico, forneça um valor " "realista de uso de RAM em idle em MB (APENAS o número, inteiro). CONTEXTO E FAIXAS REALISTAS:\n" "- Lightweight (LXDE, LXQt, Xfce, i3, Openbox): 300-600 MB\n" "- Medium (MATE, Cinnamon, Budgie): 600-900 MB\n" "- Heavy (GNOME, KDE Plasma, Pantheon): 800-1500 MB\n" "- Gaming/specialized (Steam Deck, HoloISO, Garuda): 1200-2500 MB\n" "- Enterprise/server (RHEL, Ubuntu Server - minimal install): 200-400 MB\n\n" "EXAMPLES:\n" "- Ubuntu (GNOME): ~1200 MB\n" "- Fedora (GNOME): ~1300 MB\n" "- KDE Neon: ~1100 MB\n" "- Pop!_OS (GNOME): ~1400 MB\n" "- Linux Mint (Cinnamon): ~800 MB\n" "- Manjaro (KDE): ~900 MB\n" "- Arch (i3): ~350 MB\n" "- Lubuntu (LXQt): ~450 MB\n\n" "Com base na categoria da distro e no ambiente gráfico, retorne SOMENTE um número inteiro em MB (ex: 1200). " "Não retorne texto, unidades ou valores abaixo de 300 MB para distribuições desktop." ),
     SheetColumn.CPU_SCORE: "score de performance de CPU de 1 a 10 (1=lento, 10=muito rápido)",
     SheetColumn.IO_SCORE: "score de performance de I/O de 1 a 10 (1=lento, 10=muito rápido)",
     SheetColumn.REQUIREMENTS: "requisitos de hardware: 'Leve', 'Médio' ou 'Alto'",
@@ -61,11 +42,11 @@ FIELD_PROMPTS = {
     SheetColumn.IMAGE_SIZE: "tamanho típico da ISO em GB (ex: 2.5)",
     SheetColumn.OS_TYPE: "tipo do SO: Linux, BSD, etc.",
     SheetColumn.BASE: "distribuição base (Debian, Arch, Independent, etc.)",
-    SheetColumn.ORIGIN: "país de origem",
+    SheetColumn.ORIGIN: "país de origem da distribuição (onde foi criada/desenvolvida originalmente). " "Retorne APENAS o nome do país em português. Exemplos de origens conhecidas:\n" "- Ubuntu, Linux Mint: Reino Unido\n" "- Fedora, Pop!_OS, CentOS: Estados Unidos\n" "- Debian: Projeto internacional (retornar 'Internacional')\n" "- Arch Linux: Canadá\n" "- Manjaro, CachyOS: Alemanha\n" "- Garuda Linux: Índia\n" "- Zorin OS: Irlanda\n" "- Deepin: China\n" "- MX Linux, antiX: Grécia\n\n" "Se não souber com certeza, retorne 'Internacional' em vez de chutar.",
     SheetColumn.STATUS: "status: Active, Discontinued, Beta",
     SheetColumn.PACKAGE_MANAGEMENT: "gerenciador de pacotes principal (apt, pacman, dnf, etc.)",
     SheetColumn.RELEASE_DATE: "data do lançamento original da distribuição no formato DD/MM/AAAA",
-    SheetColumn.LATEST_RELEASE: "data da última versão lançada no formato DD/MM/AAAA",
+    SheetColumn.LATEST_RELEASE: "date of the newest version of the distro in format DD/MM/YYYY (search it online, we are in 2025)",
     SheetColumn.WEBSITE: "URL completa da homepage oficial da distribuição linux.",
     SheetColumn.PRICE: "modelo de preço: 'Gratuito', 'Pago', 'Freemium' ou 'Doações' (a maioria é Gratuito)",
 }
