@@ -33,8 +33,48 @@ class SheetColumn(str, Enum):
 FIELD_PROMPTS = {
     SheetColumn.DESCRIPTION: "uma descrição concisa em português da distribuição. Deve realçar o diferencial da distribuição, onde é mais aplicada, etc. (máx. 200 caracteres)",
     SheetColumn.IDLE_RAM_USAGE: ( "Analise a distribuição Linux e, levando em conta o ambiente gráfico, forneça um valor " "realista de uso de RAM em idle em MB (APENAS o número, inteiro). CONTEXTO E FAIXAS REALISTAS:\n" "- Lightweight (LXDE, LXQt, Xfce, i3, Openbox): 300-600 MB\n" "- Medium (MATE, Cinnamon, Budgie): 600-900 MB\n" "- Heavy (GNOME, KDE Plasma, Pantheon): 800-1500 MB\n" "- Gaming/specialized (Steam Deck, HoloISO, Garuda): 1200-2500 MB\n" "- Enterprise/server (RHEL, Ubuntu Server - minimal install): 200-400 MB\n\n" "EXAMPLES:\n" "- Ubuntu (GNOME): ~1200 MB\n" "- Fedora (GNOME): ~1300 MB\n" "- KDE Neon: ~1100 MB\n" "- Pop!_OS (GNOME): ~1400 MB\n" "- Linux Mint (Cinnamon): ~800 MB\n" "- Manjaro (KDE): ~900 MB\n" "- Arch (i3): ~350 MB\n" "- Lubuntu (LXQt): ~450 MB\n\n" "Com base na categoria da distro e no ambiente gráfico, retorne SOMENTE um número inteiro em MB (ex: 1200). " "Não retorne texto, unidades ou valores abaixo de 300 MB para distribuições desktop." ),
-    SheetColumn.CPU_SCORE: "score de performance de CPU de 1 a 10 (1=lento, 10=muito rápido)",
-    SheetColumn.IO_SCORE: "score de performance de I/O de 1 a 10 (1=lento, 10=muito rápido)",
+    SheetColumn.CPU_SCORE: (
+        "Avalie a performance de CPU da distribuição de 1.0 a 10.0 com base nos seguintes critérios:\n\n"
+        "FATORES QUE AUMENTAM O SCORE:\n"
+        "- Kernel otimizado (zen, liquorix, xanmod): +1.0\n"
+        "- Compilação com flags de otimização (-O3, march=native): +0.5\n"
+        "- Uso de musl libc em vez de glibc: +0.3\n"
+        "- Ausência de systemd (ex: Artix, Void): +0.3\n"
+        "- Rolling release com pacotes atualizados: +0.3\n\n"
+        "FATORES QUE DIMINUEM O SCORE:\n"
+        "- Kernel LTS antigo: -0.5\n"
+        "- Muitos serviços rodando por padrão: -0.5\n"
+        "- Foco em estabilidade sobre performance: -0.3\n\n"
+        "EXEMPLOS DE SCORES:\n"
+        "- CachyOS, Clear Linux: 9.5 (altamente otimizado)\n"
+        "- Arch, Fedora: 8.5 (atualizado, bom compilador)\n"
+        "- Manjaro, Pop!_OS: 8.0 (baseado em Arch/Ubuntu recente)\n"
+        "- Ubuntu, Linux Mint: 7.0 (estável, não otimizado)\n"
+        "- Debian Stable: 6.5 (kernel LTS, conservador)\n"
+        "- Raspberry Pi OS, antiX: 6.0 (hardware limitado)\n\n"
+        "Retorne APENAS um número decimal (ex: 7.5)."
+    ),
+    SheetColumn.IO_SCORE: (
+        "Avalie a performance de I/O (disco) da distribuição de 1.0 a 10.0 com base nos seguintes critérios:\n\n"
+        "FATORES QUE AUMENTAM O SCORE:\n"
+        "- Sistema de arquivos rápido por padrão (btrfs, f2fs): +0.5\n"
+        "- Scheduler de I/O otimizado (BFQ, mq-deadline): +0.5\n"
+        "- zram/zswap habilitado por padrão: +0.3\n"
+        "- Gerenciador de pacotes eficiente (pacman > dnf > apt): +0.3\n"
+        "- Uso de compressão zstd nos pacotes: +0.2\n\n"
+        "FATORES QUE DIMINUEM O SCORE:\n"
+        "- Snap/Flatpak pré-instalado (I/O lento): -0.5\n"
+        "- Sistema de arquivos conservador (ext4 sem tune): -0.3\n"
+        "- Journald com logs persistentes pesados: -0.2\n\n"
+        "EXEMPLOS DE SCORES:\n"
+        "- CachyOS, Garuda: 9.0 (btrfs + zstd + otimizado)\n"
+        "- Arch, Void: 8.5 (pacman rápido, sistema leve)\n"
+        "- Fedora: 8.0 (btrfs default, dnf melhorado)\n"
+        "- Pop!_OS, Elementary: 7.5 (ext4 otimizado)\n"
+        "- Ubuntu: 7.0 (snap adiciona overhead)\n"
+        "- Debian: 6.5 (conservador, ext4 padrão)\n\n"
+        "Retorne APENAS um número decimal (ex: 7.5)."
+    ),
     SheetColumn.REQUIREMENTS: "requisitos de hardware: 'Leve', 'Médio' ou 'Alto'",
     SheetColumn.OFFICE_SUITE: "suite de escritório padrão incluída (ex: LibreOffice, OnlyOffice, nenhuma)",
     SheetColumn.CATEGORY: "categoria principal: Desktop, Server, IoT, Education, Gaming, etc.",
@@ -192,21 +232,21 @@ async def enrich_distros_with_groq(
                             f"{name} ({desktop_env}): RAM validado = {validated_ram} MB"
                         )
 
-                    # 3. Validar CPU Score se presente
+                    # 3. Validar CPU Score se presente (agora aceita decimais)
                     if "CPU Score" in enriched:
                         try:
-                            cpu = int(enriched["CPU Score"])
-                            enriched["CPU Score"] = max(1, min(10, cpu))
+                            cpu = float(enriched["CPU Score"])
+                            enriched["CPU Score"] = round(max(1.0, min(10.0, cpu)), 1)
                         except:
-                            enriched["CPU Score"] = 7
+                            enriched["CPU Score"] = 7.0
 
-                    # 4. Validar I/O Score se presente
+                    # 4. Validar I/O Score se presente (agora aceita decimais)
                     if "I/O Score" in enriched:
                         try:
-                            io = int(enriched["I/O Score"])
-                            enriched["I/O Score"] = max(1, min(10, io))
+                            io = float(enriched["I/O Score"])
+                            enriched["I/O Score"] = round(max(1.0, min(10.0, io)), 1)
                         except:
-                            enriched["I/O Score"] = 7
+                            enriched["I/O Score"] = 7.0
 
                     results.append(enriched)
                 else:
