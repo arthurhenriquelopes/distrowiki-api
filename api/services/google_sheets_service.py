@@ -213,8 +213,8 @@ class GoogleSheetsService:
                     pass
 
             idle_ram = _parse_int(data.get("idle ram usage", ""))
-            cpu_score = _parse_int(data.get("cpu score", ""))
-            io_score = _parse_int(data.get("i/o score", ""))
+            cpu_score = _parse_float(data.get("cpu score", ""))
+            io_score = _parse_float(data.get("i/o score", ""))
             requirements = data.get("requirements", "").strip() or None
             package_mgmt = data.get("package management", "").strip() or None
             image_size = _parse_size_to_gb(data.get("image size", ""))
