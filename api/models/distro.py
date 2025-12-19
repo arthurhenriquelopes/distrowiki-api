@@ -148,16 +148,16 @@ class DistroMetadata(BaseModel):
         example=800
     )
     
-    cpu_score: Optional[int] = Field(
+    cpu_score: Optional[float] = Field(
         None,
-        description="Score de performance de CPU (1-10)",
-        example=8
+        description="Score de performance de CPU (1.0-10.0)",
+        example=8.5
     )
     
-    io_score: Optional[int] = Field(
+    io_score: Optional[float] = Field(
         None,
-        description="Score de performance de I/O (1-10)",
-        example=9
+        description="Score de performance de I/O (1.0-10.0)",
+        example=8.5
     )
     
     requirements: Optional[str] = Field(
@@ -215,8 +215,8 @@ class DistroMetadata(BaseModel):
                 "category": "Desktop/Performance",
                 "desktop_environments": ["KDE Plasma"],
                 "idle_ram_usage": 800,
-                "cpu_score": 9,
-                "io_score": 9,
+                "cpu_score": 9.0,
+                "io_score": 9.0,
                 "requirements": "Médio",
                 "package_management": "pacman",
                 "image_size": 2.5,
