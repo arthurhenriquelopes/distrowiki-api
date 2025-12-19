@@ -96,6 +96,78 @@ async def enrich_sheets_auto_endpoint(
         await sheets_service.close()
 
 
+@router.post("/batch", dependencies=[Depends(get_api_key)])
+async def enrich_sheets_batch_endpoint(
+    fields: Optional[List[SheetColumn]] = Body(None, embed=True),
+    offset: int = Body(0, embed=True),
+    limit: int = Body(5, embed=True),
+):
+    """
+    🔒 PROTEGIDO: Enriquecimento em BATCH (processa N distros por vez).
+    
+    Use para evitar timeout do Vercel. Chame múltiplas vezes incrementando offset.
+    
+    Exemplo:
+    - 1ª chamada: {"offset": 0, "limit": 5}  → distros 0-4
+    - 2ª chamada: {"offset": 5, "limit": 5}  → distros 5-9
+    - etc.
+    """
+    sheets_service = GoogleSheetsService()
+    try:
+        distros = await sheets_service.fetch_all_distros()
+        all_names = [distro.name for distro in distros if distro.name]
+        
+        # Aplicar paginação
+        batch_names = all_names[offset:offset + limit]
+        
+        if not batch_names:
+            return JSONResponse(
+                content={
+                    "message": "Nenhuma distro para processar neste offset",
+                    "total_distros": len(all_names),
+                    "offset": offset,
+                    "limit": limit,
+                    "done": True,
+                }
+            )
+        
+        fields_to_update = fields or [
+            SheetColumn.IDLE_RAM_USAGE,
+            SheetColumn.CPU_SCORE,
+            SheetColumn.IO_SCORE,
+            SheetColumn.REQUIREMENTS,
+        ]
+        
+        enriched = await enrich_distros_with_groq(batch_names, fields_to_update)
+        
+        update_result = await sheets_service.update_enriched_data(
+            enriched, fields_to_update
+        )
+        
+        has_more = offset + limit < len(all_names)
+        
+        return JSONResponse(
+            content={
+                "batch": {
+                    "offset": offset,
+                    "limit": limit,
+                    "processed": len(batch_names),
+                    "total_distros": len(all_names),
+                    "next_offset": offset + limit if has_more else None,
+                    "done": not has_more,
+                },
+                "enrichment": {
+                    "distros_processed": batch_names,
+                    "fields_enriched": [f.value for f in fields_to_update],
+                },
+                "sheet_update": update_result,
+                "results": enriched,
+            }
+        )
+    finally:
+        await sheets_service.close()
+
+
 @router.post("/by-name", dependencies=[Depends(get_api_key)])
 async def enrich_specific_distros_auto_endpoint(
     names: List[str] = Body(..., embed=True),
