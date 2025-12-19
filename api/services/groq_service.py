@@ -32,7 +32,25 @@ class SheetColumn(str, Enum):
 # Descrições para o prompt da IA
 FIELD_PROMPTS = {
     SheetColumn.DESCRIPTION: "uma descrição concisa em português da distribuição. Deve realçar o diferencial da distribuição, onde é mais aplicada, etc. (máx. 200 caracteres)",
-    SheetColumn.IDLE_RAM_USAGE: ( "Analise a distribuição Linux e, levando em conta o ambiente gráfico, forneça um valor " "realista de uso de RAM em idle em MB (APENAS o número, inteiro). CONTEXTO E FAIXAS REALISTAS:\n" "- Lightweight (LXDE, LXQt, Xfce, i3, Openbox): 300-600 MB\n" "- Medium (MATE, Cinnamon, Budgie): 600-900 MB\n" "- Heavy (GNOME, KDE Plasma, Pantheon): 800-1500 MB\n" "- Gaming/specialized (Steam Deck, HoloISO, Garuda): 1200-2500 MB\n" "- Enterprise/server (RHEL, Ubuntu Server - minimal install): 200-400 MB\n\n" "EXAMPLES:\n" "- Ubuntu (GNOME): ~1200 MB\n" "- Fedora (GNOME): ~1300 MB\n" "- KDE Neon: ~1100 MB\n" "- Pop!_OS (GNOME): ~1400 MB\n" "- Linux Mint (Cinnamon): ~800 MB\n" "- Manjaro (KDE): ~900 MB\n" "- Arch (i3): ~350 MB\n" "- Lubuntu (LXQt): ~450 MB\n\n" "Com base na categoria da distro e no ambiente gráfico, retorne SOMENTE um número inteiro em MB (ex: 1200). " "Não retorne texto, unidades ou valores abaixo de 300 MB para distribuições desktop." ),
+    SheetColumn.IDLE_RAM_USAGE: (
+        "Informe o uso de RAM em idle (MB) desta distribuição Linux. "
+        "Considere o ambiente gráfico padrão e serviços de background.\n\n"
+        "FAIXAS POR AMBIENTE GRÁFICO:\n"
+        "- Minimal (i3, Sway, Openbox, dwm): 250-450 MB\n"
+        "- Leve (LXQt, LXDE, Xfce): 400-650 MB\n"
+        "- Médio (MATE, Cinnamon, Budgie): 650-950 MB\n"
+        "- Pesado (GNOME, KDE Plasma, Pantheon, Deepin): 900-1500 MB\n"
+        "- Gaming (Garuda, Nobara, HoloISO): 1200-2000 MB\n\n"
+        "FATORES QUE AUMENTAM RAM:\n"
+        "- Muitos serviços pré-instalados (Bluetooth, cups, avahi): +100-200 MB\n"
+        "- Snap/Flatpak ativo: +100-150 MB\n"
+        "- Compositor pesado (mutter, kwin): +100 MB\n\n"
+        "EXEMPLOS CALIBRADOS:\n"
+        "Alpine (console): 50 | Void (i3): 280 | Arch (i3): 350 | Lubuntu: 450 | "
+        "Xubuntu: 550 | Mint Cinnamon: 800 | Manjaro KDE: 950 | Fedora GNOME: 1300 | "
+        "Ubuntu: 1250 | Pop!_OS: 1400 | Garuda: 1600\n\n"
+        "Retorne APENAS o número inteiro em MB (ex: 850)."
+    ),
     SheetColumn.CPU_SCORE: (
         "Avalie a performance de CPU da distribuição de 1.0 a 10.0 com base nos seguintes critérios:\n\n"
         "FATORES QUE AUMENTAM O SCORE:\n"
