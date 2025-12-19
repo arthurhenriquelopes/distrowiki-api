@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from groq import Groq
 from typing import List, Dict, Any, Optional
 from enum import Enum
@@ -192,7 +193,13 @@ async def enrich_distros_with_groq(
         ]
 
     results = []
+    request_count = 0
+    
     for name in distro_names:
+        # Rate limiting: 2.5 seconds between requests to stay under 30 req/min
+        if request_count > 0:
+            await asyncio.sleep(2.5)
+        request_count += 1
         field_lines = [f'  "{field.value}": {FIELD_PROMPTS[field]}' for field in fields]
 
         prompt = (
