@@ -3,6 +3,9 @@ Módulo de segurança e autenticação da API.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import Security, HTTPException, status
 from fastapi.security import APIKeyHeader
 
@@ -27,6 +30,7 @@ def get_api_key(api_key: str = Security(API_KEY_HEADER)) -> str:
     # Buscar API Key(s) válidas do ambiente
     valid_keys = os.getenv("API_KEY", "").split(",")
     valid_keys = [key.strip() for key in valid_keys if key.strip()]
+    
     
     if not valid_keys:
         raise HTTPException(
