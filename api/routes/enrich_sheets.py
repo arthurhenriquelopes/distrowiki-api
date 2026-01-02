@@ -6,7 +6,7 @@ from typing import List, Optional
 import logging
 
 from ..services.google_sheets_service import GoogleSheetsService
-from ..services.groq_service import enrich_distros_with_groq, SheetColumn, FIELD_PROMPTS
+from ..services.perplexity_service import enrich_distros_with_perplexity, SheetColumn, FIELD_PROMPTS
 from ..services.release_scraper import get_bulk_release_dates
 from ..security import get_api_key
 
@@ -25,7 +25,7 @@ async def enrich_sheets_manual_endpoint(
     try:
         distros = await sheets_service.fetch_all_distros()
         distro_names = [distro.name for distro in distros if distro.name]
-        enriched = await enrich_distros_with_groq(distro_names, fields)
+        enriched = await enrich_distros_with_perplexity(distro_names, fields)
 
         return JSONResponse(
             content={
@@ -47,7 +47,7 @@ async def enrich_specific_distros_manual_endpoint(
     """
     🔒 PROTEGIDO: Enriquece distros específicas (manual - só retorna JSON).
     """
-    enriched = await enrich_distros_with_groq(names, fields)
+    enriched = await enrich_distros_with_perplexity(names, fields)
     return JSONResponse(
         content={
             "results": enriched,
@@ -68,7 +68,7 @@ async def enrich_sheets_auto_endpoint(
     try:
         distros = await sheets_service.fetch_all_distros()
         distro_names = [distro.name for distro in distros if distro.name]
-        enriched = await enrich_distros_with_groq(distro_names, fields)
+        enriched = await enrich_distros_with_perplexity(distro_names, fields)
 
         fields_to_update = fields or [
             SheetColumn.IDLE_RAM_USAGE,
@@ -138,7 +138,7 @@ async def enrich_sheets_batch_endpoint(
             SheetColumn.REQUIREMENTS,
         ]
         
-        enriched = await enrich_distros_with_groq(batch_names, fields_to_update)
+        enriched = await enrich_distros_with_perplexity(batch_names, fields_to_update)
         
         update_result = await sheets_service.update_enriched_data(
             enriched, fields_to_update
@@ -223,9 +223,9 @@ async def enrich_specific_distros_auto_endpoint(
 
         if fields_for_groq:
             logger.info(
-                f"🤖 Enriquecendo via Groq: {[f.value for f in fields_for_groq]}"
+                f"🤖 Enriquecendo via Perplexity: {[f.value for f in fields_for_groq]}"
             )
-            groq_results = await enrich_distros_with_groq(names, fields_for_groq)
+            groq_results = await enrich_distros_with_perplexity(names, fields_for_groq)
 
             # Merge resultados
             for item in groq_results:
