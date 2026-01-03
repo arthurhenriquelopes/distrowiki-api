@@ -16,6 +16,10 @@ import os
 # Adiciona o diretório raiz ao path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Carrega variáveis de ambiente do .env
+from dotenv import load_dotenv
+load_dotenv()
+
 from api.services.distrowatch_scraper import DistroWatchScraper
 from api.services.google_sheets_service import GoogleSheetsService
 
@@ -25,12 +29,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Cache global de ID -> Nome
+DISTRO_ID_TO_NAME = {}
+
 
 async def get_all_distro_ids() -> list:
-    """Busca todos os IDs de distros da planilha."""
+    """Busca todos os IDs de distros da planilha e popula o cache de nomes."""
+    global DISTRO_ID_TO_NAME
     sheets = GoogleSheetsService()
     try:
         distros = await sheets.fetch_all_distros()
+        # Popula o cache de id -> nome para usar na formatação
+        DISTRO_ID_TO_NAME = {d.id: d.name for d in distros if d.id and d.name}
         return [d.id for d in distros if d.id]
     finally:
         await sheets.close()
@@ -84,15 +94,29 @@ def format_results_for_sheet(results: list) -> list:
     for r in results:
         if "error" in r:
             continue
-            
-        formatted.append({
-            "Name": r.get("distro_id", ""),  # Mapeia para coluna Name
-            "Architecture": ", ".join(r.get("architecture", [])) if r.get("architecture") else "",
-            "Popularity Rank": str(r.get("popularity_rank", "")) if r.get("popularity_rank") else "",
-            "Release Type": r.get("release_type", ""),
-            "Init System": r.get("init_system", ""),
-            "File Systems": ", ".join(r.get("file_systems", [])) if r.get("file_systems") else "",
-        })
+        
+        distro_id = r.get("distro_id", "")
+        # Busca o nome real da distro a partir do cache
+        distro_name = DISTRO_ID_TO_NAME.get(distro_id, distro_id)
+        
+        # Só adiciona se tiver algum dado para atualizar
+        has_data = any([
+            r.get("architecture"),
+            r.get("popularity_rank"),
+            r.get("release_type"),
+            r.get("init_system"),
+            r.get("file_systems"),
+        ])
+        
+        if has_data:
+            formatted.append({
+                "Name": distro_name,  # Usa o nome real para match na planilha
+                "Architecture": ", ".join(r.get("architecture", [])) if r.get("architecture") else "",
+                "Popularity Rank": str(r.get("popularity_rank", "")) if r.get("popularity_rank") else "",
+                "Release Type": r.get("release_type", ""),
+                "Init System": r.get("init_system", ""),
+                "File Systems": ", ".join(r.get("file_systems", [])) if r.get("file_systems") else "",
+            })
     
     return formatted
 
