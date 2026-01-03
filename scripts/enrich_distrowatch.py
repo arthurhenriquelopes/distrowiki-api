@@ -149,6 +149,7 @@ def get_static_results(distro_ids: list) -> list:
         if static:
             results.append({
                 "distro_id": distro_id,
+                "popularity_rank": static.get("popularity_rank"),
                 "init_system": static.get("init_system", ""),
                 "file_systems": static.get("file_systems", []),
                 "release_type": static.get("release_type", ""),
