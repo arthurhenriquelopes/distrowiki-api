@@ -92,10 +92,10 @@ class DistroMetadata(BaseModel):
         example="Germany"
     )
     
-    architecture: Optional[str] = Field(
+    architecture: Optional[List[str]] = Field(
         None,
         description="Arquiteturas suportadas",
-        example="x86_64, ARM64"
+        example=["x86_64", "ARM64"]
     )
     
     desktop_environments: List[DesktopEnvironment] = Field(
@@ -127,6 +127,34 @@ class DistroMetadata(BaseModel):
         description="Avaliação média (0-10)",
         example=8.1
     )
+    
+    # ====== NOVOS CAMPOS DISTROWATCH ======
+    
+    popularity_rank: Optional[int] = Field(
+        None,
+        description="Ranking de popularidade no DistroWatch (últimos 12 meses)",
+        example=8
+    )
+    
+    release_type: Optional[str] = Field(
+        None,
+        description="Tipo de lançamento: LTS, Rolling, Point Release, etc.",
+        example="Rolling"
+    )
+    
+    init_system: Optional[str] = Field(
+        None,
+        description="Sistema de inicialização (systemd, OpenRC, runit, etc)",
+        example="systemd"
+    )
+    
+    file_systems: Optional[List[str]] = Field(
+        None,
+        description="Sistemas de arquivos suportados",
+        example=["ext4", "Btrfs", "ZFS", "XFS"]
+    )
+    
+    # ====== FIM NOVOS CAMPOS ======
     
     homepage: Optional[str] = Field(
         None,

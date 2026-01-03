@@ -220,6 +220,29 @@ class GoogleSheetsService:
             image_size = _parse_size_to_gb(data.get("image size", ""))
             office_suite = data.get("office suite", "").strip() or None
 
+            # ====== NOVOS CAMPOS ======
+            # Arquitetura (pode ter múltiplas separadas por vírgula)
+            arch_str = data.get("architecture", "").strip()
+            architecture = None
+            if arch_str:
+                architecture = [a.strip() for a in arch_str.split(",") if a.strip()]
+            
+            # Ranking de popularidade
+            popularity_rank = _parse_int(data.get("popularity rank", "") or data.get("ranking", ""))
+            
+            # Tipo de release (LTS, Rolling, Point Release)
+            release_type = data.get("release type", "").strip() or data.get("update model", "").strip() or None
+            
+            # Sistema de init
+            init_system = data.get("init system", "").strip() or data.get("init", "").strip() or None
+            
+            # File systems suportados (lista)
+            fs_str = data.get("file systems", "").strip() or data.get("filesystems", "").strip()
+            file_systems = None
+            if fs_str:
+                file_systems = [f.strip() for f in fs_str.split(",") if f.strip()]
+            # ====== FIM NOVOS CAMPOS ======
+
             return DistroMetadata(
                 id=distro_id,
                 name=name,
@@ -236,7 +259,11 @@ class GoogleSheetsService:
                 release_year=release_year,
                 homepage=data.get("website", "").strip() or None,
                 os_type=data.get("os type", "").strip() or None,
-                architecture=None, #TODO: adicionar arquitetura
+                architecture=architecture,
+                popularity_rank=popularity_rank,
+                release_type=release_type,
+                init_system=init_system,
+                file_systems=file_systems,
                 rating=self._parse_rating(data.get("price (r$)", "")),
                 idle_ram_usage=idle_ram,
                 cpu_score=cpu_score,
