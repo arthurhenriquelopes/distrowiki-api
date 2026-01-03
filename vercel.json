@@ -20,6 +20,10 @@
     {
       "path": "/distros/refresh",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/scraper/distrowatch/enrich-all",
+      "schedule": "0 4 * * 0"
     }
   ]
 }

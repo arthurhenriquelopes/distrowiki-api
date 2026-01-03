@@ -95,3 +95,52 @@ async def test_scraper():
         }
     finally:
         await scraper.close()
+
+
+@router.get("/distrowatch/enrich-all")
+async def enrich_all_distros():
+    """
+    Enriquece todas as distros com dados do DistroWatch.
+    Usado pelo cron job semanal.
+    
+    Processa em batches de 10 distros para evitar timeout.
+    """
+    logger.info("Iniciando enrichment semanal via cron...")
+    
+    try:
+        # Buscar todas as distros
+        sheets = GoogleSheetsService()
+        distros = await sheets.fetch_all_distros()
+        await sheets.close()
+        
+        distro_ids = [d.id for d in distros if d.id][:20]  # Limita a 20 para o cron
+        
+        logger.info(f"Processando {len(distro_ids)} distros...")
+        
+        # Scrape em batches
+        scraper = DistroWatchScraper()
+        results = []
+        
+        try:
+            for distro_id in distro_ids:
+                result = await scraper.scrape_distro(distro_id)
+                if "error" not in result:
+                    results.append(result)
+        finally:
+            await scraper.close()
+        
+        logger.info(f"Enrichment concluído: {len(results)} distros processadas")
+        
+        return {
+            "status": "completed",
+            "processed": len(results),
+            "total": len(distro_ids),
+            "message": "Weekly enrichment executed"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro no enrichment: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "message": str(e)
+        }

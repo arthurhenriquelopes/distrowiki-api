@@ -25,6 +25,9 @@ import httpx
 from bs4 import BeautifulSoup
 import re
 
+# Importar mapeamento de IDs
+from .id_mapping import get_distrowatch_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,9 +85,9 @@ class DistroWatchScraper:
         None,  # Às vezes sem referer
     ]
     
-    # Delay config (segundos)
-    MIN_DELAY = 3.0
-    MAX_DELAY = 7.0
+    # Delay config (segundos) - aumentado para evitar bloqueios
+    MIN_DELAY = 10.0
+    MAX_DELAY = 15.0
     
     def __init__(self):
         self.client: Optional[httpx.AsyncClient] = None
@@ -141,12 +144,12 @@ class DistroWatchScraper:
         
         self.last_request_time = datetime.now()
     
-    async def fetch_distro_page(self, distro_id: str) -> Optional[str]:
+    async def fetch_distro_page(self, distrowiki_id: str) -> Optional[str]:
         """
         Busca a página de uma distro no DistroWatch.
         
         Args:
-            distro_id: ID da distro (ex: "ubuntu", "manjaro")
+            distrowiki_id: ID da distro no DistroWiki (será convertido para ID do DW)
             
         Returns:
             HTML da página ou None se falhar
@@ -154,21 +157,24 @@ class DistroWatchScraper:
         await self._init_client()
         await self._delay_with_jitter()
         
-        url = f"{self.BASE_URL}/table.php?distribution={distro_id}"
+        # Converter ID para formato DistroWatch
+        distrowatch_id = get_distrowatch_id(distrowiki_id)
+        
+        url = f"{self.BASE_URL}/table.php?distribution={distrowatch_id}"
         headers = self._get_random_headers()
         
         try:
-            logger.info(f"Scraping DistroWatch: {distro_id}")
+            logger.info(f"Scraping DistroWatch: {distrowiki_id} -> {distrowatch_id}")
             response = await self.client.get(url, headers=headers)
             
             if response.status_code == 200:
                 return response.text
             else:
-                logger.warning(f"Status {response.status_code} para {distro_id}")
+                logger.warning(f"Status {response.status_code} para {distrowatch_id}")
                 return None
                 
         except Exception as e:
-            logger.error(f"Erro ao buscar {distro_id}: {e}")
+            logger.error(f"Erro ao buscar {distrowatch_id}: {e}")
             return None
     
     def parse_distro_data(self, html: str) -> Dict[str, Any]:
