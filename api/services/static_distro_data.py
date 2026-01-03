@@ -219,6 +219,444 @@ STATIC_DISTRO_DATA = {
         "release_type": "Point Release",
         "architecture": ["x86_64", "i686"],
     },
+    
+    # === Ubuntu Flavors ===
+    "kubuntu": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "xubuntu": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "lubuntu": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "ubuntumate": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "ubuntubudgie": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "ubuntustudio": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "ubuntukylin": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "ubuntucinnamon": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "ubuntuunity": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "edubuntu": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "lmde": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    
+    # === Arch-based (more) ===
+    "archcraft": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "biglinux": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "blendos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "rebornos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "bluestar": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    
+    # === Debian-based (more) ===
+    "devuan": {
+        "init_system": "sysvinit, OpenRC, runit",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686", "ARM64"],
+    },
+    "kdeneon": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "pureos": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "trisquel": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "linuxlite": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "endless": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "nitrux": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "spirallinux": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "siduction": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "sparkylinux": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling/Point Release",
+        "architecture": ["x86_64", "i686"],
+    },
+    "q4os": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686", "ARM64"],
+    },
+    
+    # === Security/Privacy Distros ===
+    "tails": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "parrotos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64", "ARM64"],
+    },
+    "qubes": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    
+    # === Slackware-based ===
+    "slackware": {
+        "init_system": "sysvinit",
+        "file_systems": ["Btrfs", "ext4", "JFS", "ReiserFS", "XFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686"],
+    },
+    "slax": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "porteus": {
+        "init_system": "sysvinit",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686"],
+    },
+    
+    # === BSD and Non-Linux ===
+    "freebsd": {
+        "init_system": "rc",
+        "file_systems": ["UFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "ARM64", "i686"],
+    },
+    "openbsd": {
+        "init_system": "rc",
+        "file_systems": ["FFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "ARM64", "i686"],
+    },
+    "netbsd": {
+        "init_system": "rc",
+        "file_systems": ["FFS", "LFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "ARM64", "i686"],
+    },
+    "ghostbsd": {
+        "init_system": "OpenRC",
+        "file_systems": ["UFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "dragonflybsd": {
+        "init_system": "rc",
+        "file_systems": ["HAMMER2", "UFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "midnightbsd": {
+        "init_system": "rc",
+        "file_systems": ["UFS", "ZFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "haiku": {
+        "init_system": "launch_daemon",
+        "file_systems": ["BFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "kolibrios": {
+        "init_system": "Native",
+        "file_systems": ["FAT32", "ext2"],
+        "release_type": "Rolling",
+        "architecture": ["x86"],
+    },
+    "openindiana": {
+        "init_system": "SMF",
+        "file_systems": ["ZFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    
+    # === Other independent ===
+    "pclinuxos": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "mageia": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "puppylinux": {
+        "init_system": "sysvinit",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686"],
+    },
+    "tinycore": {
+        "init_system": "BusyBox init",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686"],
+    },
+    "slitaz": {
+        "init_system": "BusyBox init",
+        "file_systems": ["ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64", "i686"],
+    },
+    "calculate": {
+        "init_system": "OpenRC, systemd",
+        "file_systems": ["Btrfs", "ext4", "XFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "chimeralinux": {
+        "init_system": "dinit",
+        "file_systems": ["Btrfs", "ext4", "XFS", "ZFS"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64", "ARM64"],
+    },
+    
+    # === Gaming/Steam ===
+    "steamos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "holoiso": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "bazzite": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "chromeos": {
+        "init_system": "upstart",
+        "file_systems": ["ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64", "ARM64"],
+    },
+    
+    # === ARM/Embedded ===
+    "raspberrypios": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["ARM64", "ARM32"],
+    },
+    "asahi": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["ARM64"],
+    },
+    
+    # === Enterprise ===
+    "rhel": {
+        "init_system": "systemd",
+        "file_systems": ["ext4", "XFS"],
+        "release_type": "LTS",
+        "architecture": ["x86_64", "ARM64"],
+    },
+    "oracle": {
+        "init_system": "systemd",
+        "file_systems": ["ext4", "XFS"],
+        "release_type": "LTS",
+        "architecture": ["x86_64", "ARM64"],
+    },
+    
+    # === Regional/Niche ===
+    "canaima": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "primtux": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64", "i686"],
+    },
+    "tuxedoos": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "pikaos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "vanilla": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "regataos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "omarchy": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    
+    # === Obscure/New ===
+    "anduinos": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "aerynos": {
+        "init_system": "systemd",
+        "file_systems": ["Btrfs", "ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "bros": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Rolling",
+        "architecture": ["x86_64"],
+    },
+    "tigeros": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
+    "locos": {
+        "init_system": "systemd",
+        "file_systems": ["ext4"],
+        "release_type": "Point Release",
+        "architecture": ["x86_64"],
+    },
 }
 
 
