@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from .routes import distros_router, enrich_sheets_router
+from .routes import distros_router, enrich_sheets_router, community_router
 
 # Configurar logging
 logging.basicConfig(
@@ -100,6 +100,7 @@ app.add_middleware(
 # Registrar rotas
 app.include_router(distros_router)
 app.include_router(enrich_sheets_router)
+app.include_router(community_router)
 
 
 @app.get("/", tags=["Root"])
