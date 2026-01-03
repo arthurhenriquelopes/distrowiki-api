@@ -4,7 +4,7 @@ Script para popular os novos campos das distros via scraping do DistroWatch.
 Executa o scraping de todas as distros e atualiza o Google Sheets.
 
 Uso:
-    python enrich_distrowatch.py [--limit N] [--update-sheet]
+    python enrich_distrowatch.py [--limit N] [--update-sheet] [--use-static-data]
 """
 
 import asyncio
@@ -22,6 +22,7 @@ load_dotenv()
 
 from api.services.distrowatch_scraper import DistroWatchScraper
 from api.services.google_sheets_service import GoogleSheetsService
+from api.services.static_distro_data import get_static_data, has_static_data
 
 logging.basicConfig(
     level=logging.INFO,
@@ -140,11 +141,33 @@ async def update_spreadsheet(data: list):
         await sheets.close()
 
 
+def get_static_results(distro_ids: list) -> list:
+    """Usa dados estáticos ao invés de scraping."""
+    results = []
+    for distro_id in distro_ids:
+        static = get_static_data(distro_id)
+        if static:
+            results.append({
+                "distro_id": distro_id,
+                "init_system": static.get("init_system", ""),
+                "file_systems": static.get("file_systems", []),
+                "release_type": static.get("release_type", ""),
+                "architecture": static.get("architecture", []),
+            })
+        else:
+            results.append({
+                "distro_id": distro_id,
+                "error": "Sem dados estáticos"
+            })
+    return results
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Enriquece dados via DistroWatch")
     parser.add_argument("--limit", type=int, help="Limita número de distros")
     parser.add_argument("--update-sheet", action="store_true", help="Atualiza Google Sheets")
     parser.add_argument("--dry-run", action="store_true", help="Apenas mostra o que seria feito")
+    parser.add_argument("--use-static-data", action="store_true", help="Usa dados estáticos ao invés de scraping")
     args = parser.parse_args()
     
     logger.info("=== DistroWatch Enrichment Script ===")
@@ -160,8 +183,17 @@ async def main():
             print(f"  - {did}")
         return
     
-    # Fazer scraping
-    results = await scrape_all_distros(distro_ids, limit=args.limit)
+    # Aplicar limite
+    if args.limit:
+        distro_ids = distro_ids[:args.limit]
+    
+    # Obter dados (estáticos ou via scraping)
+    if args.use_static_data:
+        logger.info(f"Usando dados estáticos para {len(distro_ids)} distros...")
+        results = get_static_results(distro_ids)
+    else:
+        logger.info(f"Iniciando scraping de {len(distro_ids)} distros...")
+        results = await scrape_all_distros(distro_ids)
     
     # Estatísticas
     success = [r for r in results if "error" not in r]
