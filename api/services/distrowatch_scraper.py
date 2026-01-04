@@ -327,11 +327,66 @@ class DistroWatchScraper:
             fs = self._find_table_value(soup, ["File Systems", "Filesystems", "Sistemas de arquivos"])
             if fs:
                 data["file_systems"] = [f.strip() for f in fs.split(",") if f.strip()]
+            
+            # Latest Release Date
+            # DistroWatch shows "Last Update:" or "Latest Release:" in the page
+            last_update = self._find_table_value(soup, ["Last Update", "Latest Release", "Última atualização"])
+            if last_update:
+                # Parse date - DistroWatch uses format like "2024-07-04" or "July 4, 2024"
+                data["latest_release"] = self._parse_distrowatch_date(last_update)
+            
+            # Also try to find from the release info section
+            if not data.get("latest_release"):
+                # Look for date in format "2024-07-04" anywhere in the page header area
+                release_section = soup.find("td", class_="TablesTitle")
+                if release_section:
+                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', release_section.get_text())
+                    if date_match:
+                        data["latest_release"] = date_match.group(1)
                 
         except Exception as e:
             logger.error(f"Erro ao parsear HTML: {e}")
             
         return data
+    
+    def _parse_distrowatch_date(self, date_str: str) -> Optional[str]:
+        """
+        Converte data do DistroWatch para formato ISO (YYYY-MM-DD).
+        
+        DistroWatch usa formatos como:
+        - "2024-07-04"
+        - "July 4, 2024" 
+        - "4 July 2024"
+        - "04/07/2024"
+        """
+        if not date_str:
+            return None
+        
+        date_str = date_str.strip()
+        
+        # Já está em ISO?
+        iso_match = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', date_str)
+        if iso_match:
+            return date_str
+        
+        # Tentar parsear com dateutil se disponível
+        try:
+            from dateutil import parser as date_parser
+            parsed = date_parser.parse(date_str, dayfirst=True)
+            return parsed.strftime('%Y-%m-%d')
+        except:
+            pass
+        
+        # Fallback: extrair números
+        date_match = re.search(r'(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})', date_str)
+        if date_match:
+            day, month, year = date_match.groups()
+            try:
+                return f"{year}-{int(month):02d}-{int(day):02d}"
+            except:
+                pass
+        
+        return None
     
     def _find_table_value(self, soup: BeautifulSoup, labels: List[str]) -> Optional[str]:
         """Busca valor em tabela dado um label."""
