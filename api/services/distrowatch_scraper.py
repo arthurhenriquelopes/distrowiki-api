@@ -178,78 +178,105 @@ class DistroWatchScraper:
         
         self.last_request_time = datetime.now()
     
-    async def fetch_distro_page(self, distrowiki_id: str) -> Optional[str]:
+    async def fetch_distro_page(self, distrowiki_id: str, max_retries: int = 3) -> Optional[str]:
         """
         Busca a página de uma distro no DistroWatch usando Playwright.
         
         Args:
             distrowiki_id: ID da distro no DistroWiki (será convertido para ID do DW)
+            max_retries: Número máximo de tentativas (padrão: 3)
             
         Returns:
             HTML da página ou None se falhar
         """
-        await self._delay_with_jitter()
-        
         # Converter ID para formato DistroWatch
         distrowatch_id = get_distrowatch_id(distrowiki_id)
         url = f"{self.BASE_URL}/table.php?distribution={distrowatch_id}"
         
-        # Tentar com Playwright primeiro
-        if await self._init_browser():
+        for attempt in range(1, max_retries + 1):
+            await self._delay_with_jitter()
+            
+            # Tentar com Playwright primeiro
+            if await self._init_browser():
+                try:
+                    if attempt > 1:
+                        logger.info(f"Tentativa {attempt}/{max_retries} para {distrowatch_id}")
+                    else:
+                        logger.info(f"Scraping com Playwright: {distrowiki_id} -> {distrowatch_id}")
+                    
+                    # Criar contexto com fingerprint realista
+                    context = await self.browser.new_context(
+                        user_agent=random.choice(self.USER_AGENTS),
+                        viewport={'width': 1920, 'height': 1080},
+                        locale='en-US',
+                        timezone_id='America/New_York',
+                    )
+                    
+                    page = await context.new_page()
+                    
+                    # Navegar - usar domcontentloaded (mais rápido que networkidle)
+                    response = await page.goto(url, wait_until='domcontentloaded', timeout=45000)
+                    
+                    if response and response.status == 200:
+                        # Simular leitura humana
+                        await page.wait_for_timeout(random.randint(1000, 2000))
+                        
+                        # Scroll suave
+                        await page.evaluate('window.scrollBy(0, 300)')
+                        await page.wait_for_timeout(random.randint(500, 1000))
+                        
+                        html = await page.content()
+                        await context.close()
+                        return html
+                    elif response and response.status == 403:
+                        logger.warning(f"Status 403 para {distrowatch_id} (tentativa {attempt}/{max_retries})")
+                        await context.close()
+                        
+                        if attempt < max_retries:
+                            # Backoff exponencial: 10s, 20s, 40s
+                            backoff = 10 * (2 ** (attempt - 1))
+                            logger.info(f"Aguardando {backoff}s antes de retry...")
+                            await asyncio.sleep(backoff)
+                            continue
+                        return None
+                    else:
+                        status = response.status if response else 'None'
+                        logger.warning(f"Status {status} para {distrowatch_id} (Playwright)")
+                        await context.close()
+                        return None
+                        
+                except Exception as e:
+                    logger.error(f"Erro Playwright para {distrowatch_id}: {e}")
+                    if attempt < max_retries:
+                        backoff = 5 * attempt
+                        await asyncio.sleep(backoff)
+                        continue
+            
+            # Fallback: usar httpx
+            await self._init_client()
+            headers = self._get_random_headers()
+            
             try:
-                logger.info(f"Scraping com Playwright: {distrowiki_id} -> {distrowatch_id}")
+                logger.info(f"Fallback httpx: {distrowiki_id} -> {distrowatch_id}")
+                response = await self.client.get(url, headers=headers)
                 
-                # Criar contexto com fingerprint realista
-                context = await self.browser.new_context(
-                    user_agent=random.choice(self.USER_AGENTS),
-                    viewport={'width': 1920, 'height': 1080},
-                    locale='en-US',
-                    timezone_id='America/New_York',
-                )
-                
-                page = await context.new_page()
-                
-                # Navegar - usar domcontentloaded (mais rápido que networkidle)
-                response = await page.goto(url, wait_until='domcontentloaded', timeout=45000)
-                
-                if response and response.status == 200:
-                    # Simular leitura humana
-                    await page.wait_for_timeout(random.randint(1000, 2000))
-                    
-                    # Scroll suave
-                    await page.evaluate('window.scrollBy(0, 300)')
-                    await page.wait_for_timeout(random.randint(500, 1000))
-                    
-                    html = await page.content()
-                    await context.close()
-                    return html
+                if response.status_code == 200:
+                    return response.text
+                elif response.status_code == 403 and attempt < max_retries:
+                    backoff = 10 * (2 ** (attempt - 1))
+                    logger.info(f"Aguardando {backoff}s antes de retry...")
+                    await asyncio.sleep(backoff)
+                    continue
                 else:
-                    status = response.status if response else 'None'
-                    logger.warning(f"Status {status} para {distrowatch_id} (Playwright)")
-                    await context.close()
+                    logger.warning(f"Status {response.status_code} para {distrowatch_id}")
                     return None
                     
             except Exception as e:
-                logger.error(f"Erro Playwright para {distrowatch_id}: {e}")
-                # Fallback para httpx
+                logger.error(f"Erro ao buscar {distrowatch_id}: {e}")
+                if attempt >= max_retries:
+                    return None
         
-        # Fallback: usar httpx
-        await self._init_client()
-        headers = self._get_random_headers()
-        
-        try:
-            logger.info(f"Fallback httpx: {distrowiki_id} -> {distrowatch_id}")
-            response = await self.client.get(url, headers=headers)
-            
-            if response.status_code == 200:
-                return response.text
-            else:
-                logger.warning(f"Status {response.status_code} para {distrowatch_id}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Erro ao buscar {distrowatch_id}: {e}")
-            return None
+        return None
     
     async def close(self):
         """Fecha o browser e o cliente HTTP."""
