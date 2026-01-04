@@ -1,19 +1,18 @@
 """
-DistroWatch Scraper Service with Anti-Detection Techniques.
+DistroWatch Scraper Service with Playwright Browser Automation.
 
-Implements stealth scraping to fetch additional distro metadata:
+Implements stealth scraping using real browser to fetch additional distro metadata:
 - Popularity ranking
 - Release type (LTS/Rolling)
 - Init system
 - File systems
 - Architectures
 
-Anti-detection techniques:
-1. Random User-Agent rotation (50+ real UAs)
-2. Request delays with jitter (3-7s)
-3. Session persistence (cookies)
-4. Referer spoofing
-5. Realistic Accept-Language headers
+Uses Playwright with Chromium for:
+1. Real browser fingerprint (bypasses 403 blocks)
+2. JavaScript execution
+3. Human-like behavior with random delays
+4. Cookie and session persistence
 """
 
 import logging
@@ -21,9 +20,18 @@ import random
 import asyncio
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-import httpx
 from bs4 import BeautifulSoup
 import re
+
+# Playwright for browser automation
+try:
+    from playwright.async_api import async_playwright, Browser, Page
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+
+# Fallback to httpx if Playwright not available
+import httpx
 
 # Importar mapeamento de IDs
 from .id_mapping import get_distrowatch_id
@@ -85,21 +93,47 @@ class DistroWatchScraper:
         None,  # Às vezes sem referer
     ]
     
-    # Delay config (segundos) - aumentado para evitar bloqueios
-    MIN_DELAY = 10.0
-    MAX_DELAY = 15.0
+    # Delay config (segundos)
+    MIN_DELAY = 5.0
+    MAX_DELAY = 10.0
     
     def __init__(self):
-        self.client: Optional[httpx.AsyncClient] = None
+        self.browser: Optional[Browser] = None
+        self.playwright = None
         self.last_request_time: Optional[datetime] = None
+        # Fallback httpx client
+        self.client: Optional[httpx.AsyncClient] = None
         
+    async def _init_browser(self):
+        """Inicializa o navegador Playwright."""
+        if not PLAYWRIGHT_AVAILABLE:
+            logger.warning("Playwright não disponível, usando httpx como fallback")
+            return False
+            
+        if self.browser is None:
+            try:
+                self.playwright = await async_playwright().start()
+                self.browser = await self.playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox',
+                    ]
+                )
+                logger.info("Playwright browser inicializado com sucesso")
+                return True
+            except Exception as e:
+                logger.error(f"Erro ao inicializar Playwright: {e}")
+                return False
+        return True
+    
     async def _init_client(self):
-        """Inicializa o cliente HTTP com sessão persistente."""
+        """Inicializa o cliente HTTP como fallback."""
         if self.client is None:
             self.client = httpx.AsyncClient(
                 timeout=30.0,
                 follow_redirects=True,
-                # Mantém cookies entre requests (session persistence)
                 cookies=httpx.Cookies(),
             )
     
@@ -146,7 +180,7 @@ class DistroWatchScraper:
     
     async def fetch_distro_page(self, distrowiki_id: str) -> Optional[str]:
         """
-        Busca a página de uma distro no DistroWatch.
+        Busca a página de uma distro no DistroWatch usando Playwright.
         
         Args:
             distrowiki_id: ID da distro no DistroWiki (será convertido para ID do DW)
@@ -154,17 +188,57 @@ class DistroWatchScraper:
         Returns:
             HTML da página ou None se falhar
         """
-        await self._init_client()
         await self._delay_with_jitter()
         
         # Converter ID para formato DistroWatch
         distrowatch_id = get_distrowatch_id(distrowiki_id)
-        
         url = f"{self.BASE_URL}/table.php?distribution={distrowatch_id}"
+        
+        # Tentar com Playwright primeiro
+        if await self._init_browser():
+            try:
+                logger.info(f"Scraping com Playwright: {distrowiki_id} -> {distrowatch_id}")
+                
+                # Criar contexto com fingerprint realista
+                context = await self.browser.new_context(
+                    user_agent=random.choice(self.USER_AGENTS),
+                    viewport={'width': 1920, 'height': 1080},
+                    locale='en-US',
+                    timezone_id='America/New_York',
+                )
+                
+                page = await context.new_page()
+                
+                # Navegar com comportamento humano
+                response = await page.goto(url, wait_until='networkidle', timeout=30000)
+                
+                if response and response.status == 200:
+                    # Simular leitura humana
+                    await page.wait_for_timeout(random.randint(1000, 2000))
+                    
+                    # Scroll suave
+                    await page.evaluate('window.scrollBy(0, 300)')
+                    await page.wait_for_timeout(random.randint(500, 1000))
+                    
+                    html = await page.content()
+                    await context.close()
+                    return html
+                else:
+                    status = response.status if response else 'None'
+                    logger.warning(f"Status {status} para {distrowatch_id} (Playwright)")
+                    await context.close()
+                    return None
+                    
+            except Exception as e:
+                logger.error(f"Erro Playwright para {distrowatch_id}: {e}")
+                # Fallback para httpx
+        
+        # Fallback: usar httpx
+        await self._init_client()
         headers = self._get_random_headers()
         
         try:
-            logger.info(f"Scraping DistroWatch: {distrowiki_id} -> {distrowatch_id}")
+            logger.info(f"Fallback httpx: {distrowiki_id} -> {distrowatch_id}")
             response = await self.client.get(url, headers=headers)
             
             if response.status_code == 200:
@@ -176,6 +250,30 @@ class DistroWatchScraper:
         except Exception as e:
             logger.error(f"Erro ao buscar {distrowatch_id}: {e}")
             return None
+    
+    async def close(self):
+        """Fecha o browser e o cliente HTTP."""
+        if self.browser:
+            try:
+                await self.browser.close()
+                self.browser = None
+            except Exception as e:
+                logger.error(f"Erro ao fechar browser: {e}")
+        
+        if self.playwright:
+            try:
+                await self.playwright.stop()
+                self.playwright = None
+            except Exception as e:
+                logger.error(f"Erro ao parar playwright: {e}")
+        
+        if self.client:
+            try:
+                await self.client.aclose()
+                self.client = None
+            except Exception as e:
+                logger.error(f"Erro ao fechar httpx client: {e}")
+
     
     def parse_distro_data(self, html: str) -> Dict[str, Any]:
         """
