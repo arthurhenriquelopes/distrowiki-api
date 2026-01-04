@@ -329,20 +329,23 @@ class DistroWatchScraper:
                 data["file_systems"] = [f.strip() for f in fs.split(",") if f.strip()]
             
             # Latest Release Date
-            # DistroWatch shows "Last Update:" or "Latest Release:" in the page
-            last_update = self._find_table_value(soup, ["Last Update", "Latest Release", "Última atualização"])
-            if last_update:
-                # Parse date - DistroWatch uses format like "2024-07-04" or "July 4, 2024"
-                data["latest_release"] = self._parse_distrowatch_date(last_update)
-            
-            # Also try to find from the release info section
-            if not data.get("latest_release"):
-                # Look for date in format "2024-07-04" anywhere in the page header area
-                release_section = soup.find("td", class_="TablesTitle")
-                if release_section:
-                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', release_section.get_text())
+            # DistroWatch shows "Last Update: YYYY-MM-DD HH:MM UTC" in an H2 tag
+            # Try H2 header first (most reliable)
+            h2_tags = soup.find_all("h2")
+            for h2 in h2_tags:
+                h2_text = h2.get_text()
+                if "Last Update" in h2_text or "Última atualização" in h2_text:
+                    # Extract date from "Last Update: 2026-01-04 08:22 UTC"
+                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', h2_text)
                     if date_match:
                         data["latest_release"] = date_match.group(1)
+                        break
+            
+            # Fallback: try table cells
+            if not data.get("latest_release"):
+                last_update = self._find_table_value(soup, ["Release Date", "Last Update", "Latest Release"])
+                if last_update:
+                    data["latest_release"] = self._parse_distrowatch_date(last_update)
                 
         except Exception as e:
             logger.error(f"Erro ao parsear HTML: {e}")
