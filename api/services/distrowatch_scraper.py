@@ -209,8 +209,8 @@ class DistroWatchScraper:
                 
                 page = await context.new_page()
                 
-                # Navegar com comportamento humano
-                response = await page.goto(url, wait_until='networkidle', timeout=30000)
+                # Navegar - usar domcontentloaded (mais rápido que networkidle)
+                response = await page.goto(url, wait_until='domcontentloaded', timeout=45000)
                 
                 if response and response.status == 200:
                     # Simular leitura humana
