@@ -68,6 +68,10 @@ DISTROWIKI_TO_DISTROWATCH = {
     "parrot": "parrot",
     "qubes": "qubes",
     
+    # Mapeamentos especiais
+    "anduinos": "anduin",  # anduinOS no DistroWatch
+    "parrotos": "parrot",
+    
     # IDs que já estão corretos (não precisam de mapeamento)
     # mas incluímos para referência
 }
@@ -76,8 +80,6 @@ DISTROWIKI_TO_DISTROWATCH = {
 DISTROWATCH_UNKNOWN = [
     "holoiso",      # Está na "Waiting List" do DistroWatch
     "tigeros",      # Está na "Waiting List" do DistroWatch
-    "locos",        # Não existe no DistroWatch
-    "anduinos",     # Não existe no DistroWatch
 ]
 
 
