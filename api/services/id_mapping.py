@@ -34,9 +34,9 @@ DISTROWIKI_TO_DISTROWATCH = {
     "rockylinux": "rocky",
     
     # SUSE-based
-    "opensuse": "suse",
-    "opensusetumbleweed": "suse",
-    "opensuselead": "suse",
+    "opensuse": "opensuse",
+    "opensusetumbleweed": "opensuse",
+    "opensuselead": "opensuse",
     
     # BSD
     "dragonflybsd": "dragonfly",
@@ -74,15 +74,10 @@ DISTROWIKI_TO_DISTROWATCH = {
 
 # IDs do DistroWatch que não existem (distros muito novas/obscuras)
 DISTROWATCH_UNKNOWN = [
-    "aerynos",
-    "anduinos",
-    "bros",
-    "bazzite",
-    "holoiso",
-    "tigeros",
-    "locosao",
-    "biglinux",  # Existe mas com outro nome
-    "blendos",
+    "holoiso",      # Está na "Waiting List" do DistroWatch
+    "tigeros",      # Está na "Waiting List" do DistroWatch
+    "locos",        # Não existe no DistroWatch
+    "anduinos",     # Não existe no DistroWatch
 ]
 
 
@@ -154,7 +149,7 @@ ALL_DISTRO_ID_MAPPINGS = [
     ("kdeneon", "neon", "KDE Neon"),
     ("almalinux", "alma", "AlmaLinux"),
     ("rockylinux", "rocky", "Rocky Linux"),
-    ("opensuse", "suse", "openSUSE"),
+    ("opensuse", "opensuse", "openSUSE"),
     ("dragonflybsd", "dragonfly", "DragonFly BSD"),
     ("cachyos", "cachy", "CachyOS"),
 ]
