@@ -44,6 +44,7 @@ def get_api_key(api_key: str = Security(API_KEY_HEADER)) -> str:
 def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Security(SECURITY)) -> str:
     """
     Validates Supabase JWT and returns user_id (sub).
+    Supports both HS256 (legacy) and ES256 (new Supabase default) algorithms.
     """
     if not credentials:
         raise HTTPException(
@@ -53,24 +54,69 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Secur
         )
 
     token = credentials.credentials
-    secret = os.getenv("SUPABASE_JWT_SECRET")
     
     try:
-        if secret:
-            # Try with audience first
+        # First, decode header to check algorithm
+        unverified_header = jwt.get_unverified_header(token)
+        algorithm = unverified_header.get("alg", "HS256")
+        
+        if algorithm == "ES256":
+            # ES256 uses asymmetric keys - need to fetch from JWKS
+            # Get Supabase URL from environment
+            supabase_url = os.getenv("SUPABASE_URL", "")
+            if not supabase_url:
+                print("ERROR: SUPABASE_URL not set, cannot validate ES256 token")
+                raise HTTPException(status_code=401, detail="Server configuration error")
+            
+            # Fetch JWKS from Supabase
+            import urllib.request
+            import json
+            jwks_url = f"{supabase_url}/auth/v1/.well-known/jwks.json"
+            
             try:
-                payload = jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
-            except jwt.InvalidAudienceError:
-                # Fallback: try without audience requirement (some Supabase configs may differ)
-                print("WARNING: JWT audience mismatch, retrying without audience check")
-                payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
+                with urllib.request.urlopen(jwks_url, timeout=5) as response:
+                    jwks = json.loads(response.read().decode())
+            except Exception as e:
+                print(f"ERROR: Failed to fetch JWKS: {e}")
+                raise HTTPException(status_code=401, detail="Failed to validate token")
+            
+            # Find the correct key by kid
+            kid = unverified_header.get("kid")
+            public_key = None
+            
+            for key in jwks.get("keys", []):
+                if key.get("kid") == kid:
+                    # Convert JWK to PEM format
+                    from jwt.algorithms import ECAlgorithm
+                    public_key = ECAlgorithm.from_jwk(json.dumps(key))
+                    break
+            
+            if not public_key:
+                print(f"ERROR: Key {kid} not found in JWKS")
+                raise HTTPException(status_code=401, detail="Token key not found")
+            
+            payload = jwt.decode(
+                token, 
+                public_key, 
+                algorithms=["ES256"], 
+                audience="authenticated"
+            )
         else:
-            print("WARNING: Decoding JWT without verification (Missing SUPABASE_JWT_SECRET)")
-            payload = jwt.decode(token, options={"verify_signature": False})
+            # HS256 uses symmetric secret
+            secret = os.getenv("SUPABASE_JWT_SECRET")
+            if not secret:
+                print("WARNING: Decoding JWT without verification (Missing SUPABASE_JWT_SECRET)")
+                payload = jwt.decode(token, options={"verify_signature": False})
+            else:
+                try:
+                    payload = jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
+                except jwt.InvalidAudienceError:
+                    print("WARNING: JWT audience mismatch, retrying without audience check")
+                    payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
             
         user_id = payload.get("sub")
         if not user_id:
-             raise HTTPException(status_code=401, detail="Token missing user ID")
+            raise HTTPException(status_code=401, detail="Token missing user ID")
         return user_id
 
     except jwt.ExpiredSignatureError:
