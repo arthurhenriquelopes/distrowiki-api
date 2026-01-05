@@ -44,6 +44,12 @@ def check_admin(user_id: str, db: Session):
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return True
 
+@router.get("/debug-auth")
+def debug_auth(user_id: str = Depends(get_current_user)):
+    """Debug endpoint to test authentication. Returns user_id if auth succeeds."""
+    return {"status": "authenticated", "user_id": user_id}
+
+
 @router.post("/vote")
 def vote_distro(
     vote: VoteRequest,
