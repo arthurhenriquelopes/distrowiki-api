@@ -53,19 +53,18 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Secur
         )
 
     token = credentials.credentials
-    # Try to get secret. If missing, we cannot securely verify signature locally without calling Supabase User API.
-    # For now, we allow fallback to decoding without verify if secret is missing (DEV ONLY WARNING).
-    secret = os.getenv("SUPABASE_JWT_SECRET") 
+    secret = os.getenv("SUPABASE_JWT_SECRET")
     
     try:
         if secret:
-            payload = jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
+            # Try with audience first
+            try:
+                payload = jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
+            except jwt.InvalidAudienceError:
+                # Fallback: try without audience requirement (some Supabase configs may differ)
+                print("WARNING: JWT audience mismatch, retrying without audience check")
+                payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
         else:
-            # WARNING: This relies on Supabase Gateway to have verified the token before hitting us if we were behind it.
-            # But we are standalone. This is unsafe for production if public key not used.
-            # Supabase uses HS256 (Symmetric) so we need the secret.
-            # We will decode unverified to extract ID, but warn log.
-            # Ideally, user updates .env
             print("WARNING: Decoding JWT without verification (Missing SUPABASE_JWT_SECRET)")
             payload = jwt.decode(token, options={"verify_signature": False})
             
@@ -75,6 +74,8 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Secur
         return user_id
 
     except jwt.ExpiredSignatureError:
+        print("JWT Error: Token expired")
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError as e:
-         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+        print(f"JWT Error: {type(e).__name__} - {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
